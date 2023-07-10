@@ -1,3 +1,0 @@
-0710-13-58-36-670,icarl,logs/benchmark/cifar100/icarl/0710-13-58-36-670_cifar100_resnet32_251745660_B0_Inc20/pred.npy,logs/benchmark/cifar100/icarl/0710-13-58-36-670_cifar100_resnet32_251745660_B0_Inc20/target.npy 
-0710-13-58-30-959,bic,logs/benchmark/cifar100/bic/0710-13-58-30-959_cifar100_resnet32_251745660_B0_Inc20/pred.npy,logs/benchmark/cifar100/bic/0710-13-58-30-959_cifar100_resnet32_251745660_B0_Inc20/target.npy 
-0710-14-48-10-579,lwf,logs/benchmark/cifar100/lwf/0710-14-48-10-579_cifar100_resnet32_251745660_B0_Inc20/pred.npy,logs/benchmark/cifar100/lwf/0710-14-48-10-579_cifar100_resnet32_251745660_B0_Inc20/target.npy 
