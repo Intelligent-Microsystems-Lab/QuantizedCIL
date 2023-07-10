@@ -59,8 +59,8 @@ class iCaRL(BaseLearner):
         )
 
         lin_w, lin_b = quant.save_lin_params(self._network)
-        quant.place_quant(self._network, lin_w, lin_b)
-        # quant.place_track(self._network, track_layer_list, '', lin_w, lin_b)
+        # quant.place_quant(self._network, lin_w, lin_b)
+        quant.place_track(self._network, track_layer_list, '', lin_w, lin_b)
 
         train_dataset = data_manager.get_dataset(
             np.arange(self._known_classes, self._total_classes),

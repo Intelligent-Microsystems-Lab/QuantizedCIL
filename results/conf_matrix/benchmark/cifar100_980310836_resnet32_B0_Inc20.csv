@@ -1,0 +1,3 @@
+0710-13-58-34-237,icarl,logs/benchmark/cifar100/icarl/0710-13-58-34-237_cifar100_resnet32_980310836_B0_Inc20/pred.npy,logs/benchmark/cifar100/icarl/0710-13-58-34-237_cifar100_resnet32_980310836_B0_Inc20/target.npy 
+0710-14-33-11-505,lwf,logs/benchmark/cifar100/lwf/0710-14-33-11-505_cifar100_resnet32_980310836_B0_Inc20/pred.npy,logs/benchmark/cifar100/lwf/0710-14-33-11-505_cifar100_resnet32_980310836_B0_Inc20/target.npy 
+0710-13-58-28-179,bic,logs/benchmark/cifar100/bic/0710-13-58-28-179_cifar100_resnet32_980310836_B0_Inc20/pred.npy,logs/benchmark/cifar100/bic/0710-13-58-28-179_cifar100_resnet32_980310836_B0_Inc20/target.npy 
