@@ -94,11 +94,18 @@ def _train(args):
     model = factory.get_model(args["model_name"], args)
 
     cnn_curve, nme_curve, no_nme = {"top1": [], "top5": []}, {"top1": [], "top5": []}, True
+
+    # quant overhead
+    quant.quantizeFwd = args["quantizeFwd"]
+    quant.quantizeBwd = args["quantizeBwd"]
+    quant.quantStoch = args["quantStoch"]
+    quant.quantCalibrate = args["quantCalibrate"]
+
     start_time = time.time()
     logging.info(f"Start time:{start_time}")
     
     for task in range(data_manager.nb_tasks):
-        if task == 0:
+        if task == 0 and quant.quantCalibrate:
             quant.calibrate_phase = True
         else:
             quant.calibrate_phase = False

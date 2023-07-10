@@ -33,6 +33,10 @@ def setup_parser():
     parser.add_argument('--debug', action="store_true")
     parser.add_argument('--skip', action="store_true",)
     parser.add_argument('--seed', '-seed', nargs='+', type=int, default=[1994],)
+    parser.add_argument('--quantizeFwd', action="store_true")
+    parser.add_argument('--quantizeBwd', action="store_true")
+    parser.add_argument('--quantStoch', action="store_true")
+    parser.add_argument('--quantCalibrate', action="store_true")
     
     return parser
 
