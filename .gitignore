@@ -1,6 +1,7 @@
 # Added
 data/*
-
+logs/*
+track_stats/*
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
