@@ -183,8 +183,6 @@ class UniformQuantizeSawb(InplaceFunction):
       scale = 2 * clip / (Qp - Qn)
 
       # import pdb; pdb.set_trace()
-      print(scale)
-      print(clip)
       output.div_(scale)
       output.clamp_(Qn, Qp).round_()
       output.mul_(scale)
