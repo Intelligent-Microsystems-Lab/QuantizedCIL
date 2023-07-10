@@ -35,13 +35,24 @@ def place_track(m, layer_list, c_path, lin_w, lin_b):
         print(c_path+'_'+attr_str)
         if c_path+'_'+attr_str in layer_list:
           track_stats[c_path+'_'+attr_str] = []
-          setattr(m, attr_str, Conv2d_track(track_name = c_path+'_'+attr_str, in_channels=target_attr.in_channels, out_channels=target_attr.out_channels, kernel_size=target_attr.kernel_size, stride=target_attr.stride,
-                padding=target_attr.padding, padding_mode=target_attr.padding_mode, dilation=target_attr.dilation, groups=target_attr.groups, bias=hasattr(target_attr, 'bias'),))
+          setattr(m, attr_str, Conv2d_track(track_name = c_path+'_'+attr_str,
+                                            in_channels=target_attr.in_channels,
+                                            out_channels=target_attr.out_channels,
+                                            kernel_size=target_attr.kernel_size,
+                                            stride=target_attr.stride,
+                                            padding=target_attr.padding,
+                                            padding_mode=target_attr.padding_mode,
+                                            dilation=target_attr.dilation,
+                                            groups=target_attr.groups,
+                                            bias=hasattr(target_attr, 'bias'),))
     if isinstance(target_attr, nn.Linear) or isinstance(target_attr, SimpleLinear):
       print(c_path+'_'+attr_str)
       if c_path+'_'+attr_str in layer_list:
         track_stats[c_path+'_'+attr_str] = []
-        setattr(m, attr_str, Linear_track(track_name = c_path+'_'+attr_str, in_features = target_attr.in_features, out_features = target_attr.out_features, bias=hasattr(target_attr, 'bias'),))
+        setattr(m, attr_str, Linear_track(track_name = c_path+'_'+attr_str,
+                                          in_features = target_attr.in_features,
+                                          out_features = target_attr.out_features,
+                                          bias=hasattr(target_attr, 'bias'),))
         if lin_w is not None:
           m.fc.weight = nn.Parameter(lin_w)
         if lin_b is not None:
@@ -56,10 +67,21 @@ def place_quant(m, lin_w, lin_b,c_path = '',):
       target_attr = getattr(m, attr_str)
       if isinstance(target_attr, nn.Conv2d):
         if not hasattr(target_attr, 'c1'):
-          setattr(m, attr_str, Conv2d_LUQ(in_channels=target_attr.in_channels, out_channels=target_attr.out_channels, kernel_size=target_attr.kernel_size, stride=target_attr.stride,
-              padding=target_attr.padding, padding_mode=target_attr.padding_mode, dilation=target_attr.dilation, groups=target_attr.groups, bias=hasattr(target_attr, 'bias'), uname = c_path+'_'+attr_str,))
+          setattr(m, attr_str, Conv2d_LUQ(in_channels=target_attr.in_channels,
+                                          out_channels=target_attr.out_channels,
+                                          kernel_size=target_attr.kernel_size,
+                                          stride=target_attr.stride,
+                                          padding=target_attr.padding,
+                                          padding_mode=target_attr.padding_mode,
+                                          dilation=target_attr.dilation,
+                                          groups=target_attr.groups,
+                                          bias=hasattr(target_attr, 'bias'),
+                                          uname = c_path+'_'+attr_str,))
       if isinstance(target_attr, nn.Linear) or isinstance(target_attr, SimpleLinear):
-        setattr(m, attr_str, Linear_LUQ(in_features = target_attr.in_features, out_features = target_attr.out_features, bias=hasattr(target_attr, 'bias'),uname = c_path+'_'+attr_str,))
+        setattr(m, attr_str, Linear_LUQ(in_features = target_attr.in_features,
+                                        out_features = target_attr.out_features,
+                                        bias=hasattr(target_attr, 'bias'),
+                                        uname = c_path+'_'+attr_str,))
         if lin_w is not None:
           m.fc.weight = nn.Parameter(lin_w)
         if lin_b is not None:
