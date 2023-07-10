@@ -25,7 +25,7 @@ from convs.linears import SimpleLinear
 track_stats = {}
 calibrate_phase = False
 
-scale_library = {}
+scale_library = {'a':{}, 'w':{}, 'g':{}}
 
 def place_track(m, layer_list, c_path, lin_w, lin_b):
   for attr_str in dir(m):
@@ -50,22 +50,22 @@ def place_track(m, layer_list, c_path, lin_w, lin_b):
     place_track(ch, layer_list, c_path + '_' + n, lin_w, lin_b)
 
 
-def place_quant(m, lin_w, lin_b):
+def place_quant(m, lin_w, lin_b,c_path = '',):
   for attr_str in dir(m):
     if attr_str[:1] != '_':
       target_attr = getattr(m, attr_str)
       if isinstance(target_attr, nn.Conv2d):
         if not hasattr(target_attr, 'c1'):
           setattr(m, attr_str, Conv2d_LUQ(in_channels=target_attr.in_channels, out_channels=target_attr.out_channels, kernel_size=target_attr.kernel_size, stride=target_attr.stride,
-              padding=target_attr.padding, padding_mode=target_attr.padding_mode, dilation=target_attr.dilation, groups=target_attr.groups, bias=hasattr(target_attr, 'bias'),))
+              padding=target_attr.padding, padding_mode=target_attr.padding_mode, dilation=target_attr.dilation, groups=target_attr.groups, bias=hasattr(target_attr, 'bias'), uname = c_path+'_'+attr_str,))
       if isinstance(target_attr, nn.Linear) or isinstance(target_attr, SimpleLinear):
-        setattr(m, attr_str, Linear_LUQ(in_features = target_attr.in_features, out_features = target_attr.out_features, bias=hasattr(target_attr, 'bias'),))
+        setattr(m, attr_str, Linear_LUQ(in_features = target_attr.in_features, out_features = target_attr.out_features, bias=hasattr(target_attr, 'bias'),uname = c_path+'_'+attr_str,))
         if lin_w is not None:
           m.fc.weight = nn.Parameter(lin_w)
         if lin_b is not None:
           m.fc.bias = nn.Parameter(lin_b)
   for n, ch in m.named_children():
-    place_quant(ch, lin_w, lin_b)
+    place_quant(ch, lin_w, lin_b,  c_path + '_' + n,)
 
 
 def save_lin_params(m):
@@ -143,38 +143,21 @@ class GradTrack(Function):
 # begin code from:
 # from https://openreview.net/pdf?id=yTbNYYcopd suppl. materials
 
-class UniformQuantizeSawb(InplaceFunction):
-
-  @staticmethod
-  def forward(ctx, input, c1, c2, Qp, Qn):
-
-    output = input.clone()
-
-    with torch.no_grad():
-      clip = (c1 * torch.sqrt(torch.mean(input**2))) - \
-          (c2 * torch.mean(input.abs()))
-      scale = 2 * clip / (Qp - Qn)
-
-      output.div_(scale)
-      output.clamp_(Qn, Qp).round_()
-      output.mul_(scale)
-    return output
-
-  @staticmethod
-  def backward(ctx, grad_output):
-    # straight-through estimator
-    grad_input = grad_output
-    return grad_input, None, None, None, None
-
-
 # class UniformQuantizeSawb(InplaceFunction):
 
 #   @staticmethod
-#   def forward(ctx, input, Qp, Qn, scale, clip):
+#   def forward(ctx, input, c1, c2, Qp, Qn):
 
 #     output = input.clone()
 
 #     with torch.no_grad():
+#       clip = (c1 * torch.sqrt(torch.mean(input**2))) - \
+#           (c2 * torch.mean(input.abs()))
+#       scale = 2 * clip / (Qp - Qn)
+
+#       # import pdb; pdb.set_trace()
+#       print(scale)
+#       print(clip)
 #       output.div_(scale)
 #       output.clamp_(Qn, Qp).round_()
 #       output.mul_(scale)
@@ -187,11 +170,31 @@ class UniformQuantizeSawb(InplaceFunction):
 #     return grad_input, None, None, None, None
 
 
+class UniformQuantizeSawb(InplaceFunction):
+
+  @staticmethod
+  def forward(ctx, input, Qp, Qn, scale, clip):
+
+    output = input.clone()
+
+    with torch.no_grad():
+      output.div_(scale)
+      output.clamp_(Qn, Qp).round_()
+      output.mul_(scale)
+    return output
+
+  @staticmethod
+  def backward(ctx, grad_output):
+    # straight-through estimator
+    grad_input = grad_output
+    return grad_input, None, None, None, None
+
+
 class Linear_LUQ(nn.Linear):
 
   """docstring for Conv2d_BF16."""
 
-  def __init__(self, *args, **kwargs):
+  def __init__(self, uname, *args, **kwargs):
     super(Linear_LUQ, self).__init__(*args, **kwargs)
     self.fullName = ''
     self.statistics = []
@@ -214,52 +217,52 @@ class Linear_LUQ(nn.Linear):
     self.register_buffer('gradScaleA', torch.zeros(1))
 
     self.quantizeFwd = True
-    self.quantizeBwd = True # True
+    self.quantizeBwd = True
 
     self.c1 = 12.1
     self.c2 = 12.2
     self.stochastic = True
     self.repeatBwd = 1
 
-    # self.scale_w = -1
-    # self.clip_w = -1
+    self.uname = uname
 
-    # self.scale_a = -1
-    # self.clip_a = -1
 
   def forward(self, input):
 
     if self.quantizeFwd:
-      # if calibrate_phase:
-      #   with torch.no_grad():
-      #     if self.clip_w == -1:
-      #       self.clip_w = (self.c1 * torch.sqrt(torch.mean(self.weight**2))) - (self.c2 * torch.mean(self.weight.abs()))
-      #       self.scale_w = 2 * self.clip_w / (self.QpW - self.QnW)
-      #     else:
-      #       self.clip_w = self.clip_w * .9 + .1 * (self.c1 * torch.sqrt(torch.mean(self.weight**2))) - (self.c2 * torch.mean(self.weight.abs()))
-      #       self.scale_w = self.scale_w * .9 + .1 * 2 * self.clip_w / (self.QpW - self.QnW)
-      #   w_q = self.weight
-      # else:
+      if calibrate_phase:
+        with torch.no_grad():
+          if self.uname not in scale_library['w']: 
+            scale_library['w'][self.uname] = {}
+            scale_library['w'][self.uname]['clip_w'] = (self.c1 * torch.sqrt(torch.mean(self.weight**2))) - (self.c2 * torch.mean(self.weight.abs()))
+            scale_library['w'][self.uname]['scale_w']= 2 * scale_library['w'][self.uname]['clip_w'] / (self.QpW - self.QnW)
+          else:
+            scale_library['w'][self.uname]['clip_w'] = scale_library['w'][self.uname]['clip_w'] * .9 + .1 * ( (self.c1 * torch.sqrt(torch.mean(self.weight**2))) - (self.c2 * torch.mean(self.weight.abs())))
+            scale_library['w'][self.uname]['scale_w'] = scale_library['w'][self.uname]['scale_w'] * .9 + .1 * ( 2 * scale_library['w'][self.uname]['clip_w'] / (self.QpW - self.QnW))
+        w_q = self.weight
+      else:
 
-      #   w_q = UniformQuantizeSawb.apply(self.weight, self.QpW, self.QnW, self.scale_w, self.clip_w)
-      w_q = UniformQuantizeSawb.apply(self.weight, self.c1, self.c2, self.QpW, self.QnW)
+        w_q = UniformQuantizeSawb.apply(self.weight, self.QpW, self.QnW, scale_library['w'][self.uname]['scale_w'], scale_library['w'][self.uname]['clip_w'])
+      # w_q = UniformQuantizeSawb.apply(self.weight, self.c1, self.c2, self.QpW, self.QnW)
 
       if torch.min(input) < 0:
         self.QnA = -2 ** (self.abits - 1)
 
 
-      # if calibrate_phase:
-      #   with torch.no_grad():
-      #     if self.clip_a == -1:
-      #       self.clip_a = (self.c1 * torch.sqrt(torch.mean(input**2))) - (self.c2 * torch.mean(input.abs()))
-      #       self.scale_a = 2 * self.clip_a / (self.QpA - self.QnA)
-      #     else:
-      #       self.clip_a = self.clip_a * .9 + .1 * (self.c1 * torch.sqrt(torch.mean(input**2))) - (self.c2 * torch.mean(input.abs()))
-      #       self.scale_a = self.scale_a * .9 + .1 * 2 * self.clip_a / (self.QpA - self.QnA)
-      #   qinput = input
-      # else:
-      #   qinput = UniformQuantizeSawb.apply(input, self.c1, self.c2, self.scale_a, self.clip_a)
-      qinput = UniformQuantizeSawb.apply(input, self.c1, self.c2, self.QpA, self.QnA)
+      if calibrate_phase:
+        with torch.no_grad():
+          if self.uname not in scale_library['a']:
+            scale_library['a'][self.uname] = {}
+            scale_library['a'][self.uname]['clip_a'] = (self.c1 * torch.sqrt(torch.mean(input**2))) - (self.c2 * torch.mean(input.abs()))
+            scale_library['a'][self.uname]['scale_a']= 2 * scale_library['a'][self.uname]['clip_a'] / (self.QpA - self.QnA)
+          else:
+            scale_library['a'][self.uname]['clip_a'] = scale_library['a'][self.uname]['clip_a'] * .9 + .1 * ( (self.c1 * torch.sqrt(torch.mean(input**2))) - (self.c2 * torch.mean(input.abs())))
+            scale_library['a'][self.uname]['scale_a'] = scale_library['a'][self.uname]['scale_a'] * .9 + .1 *  (2 * scale_library['a'][self.uname]['clip_a'] / (self.QpA - self.QnA))
+        qinput = input
+      else:
+        qinput = UniformQuantizeSawb.apply(input, self.QpA, self.QnA, scale_library['a'][self.uname]['scale_a'], scale_library['a'][self.uname]['clip_a'])
+
+      # qinput = UniformQuantizeSawb.apply(input, self.c1, self.c2, self.QpA, self.QnA)
 
       # all
       output = F.linear(qinput, w_q, self.bias)
@@ -267,12 +270,9 @@ class Linear_LUQ(nn.Linear):
     else:
       output = F.linear(input, self.weight, self.bias)
 
-    # if torch.isnan(output).any():
-    # if not calibrate_phase:
-    #   import pdb; pdb.set_trace()
 
     output = GradStochasticClippingQ.apply(
-       output, self.quantizeBwd, self.layerIdx, self.repeatBwd)
+       output, self.quantizeBwd, self.layerIdx, self.repeatBwd, self.uname)
     return {'logits': output}
 
 
@@ -280,7 +280,7 @@ class Conv2d_LUQ(nn.Conv2d):
 
   """docstring for Conv2d_BF16."""
 
-  def __init__(self, *args, **kwargs):
+  def __init__(self, uname, *args, **kwargs):
     super(Conv2d_LUQ, self).__init__(*args, **kwargs)
     self.fullName = ''
     self.statistics = []
@@ -310,48 +310,41 @@ class Conv2d_LUQ(nn.Conv2d):
     self.stochastic = True
     self.repeatBwd = 1
 
-    # self.scale_w = -1
-    # self.clip_w = -1
-
-    # self.scale_a = -1
-    # self.clip_a = -1
-
-    # import pdb; pdb.set_trace()
+    self.uname = uname
 
   def forward(self, input):
 
+
     if self.quantizeFwd:
-      # if calibrate_phase:
-      #   with torch.no_grad():
-      #     if self.clip_w == -1:
-      #       self.clip_w = (self.c1 * torch.sqrt(torch.mean(self.weight**2))) - (self.c2 * torch.mean(self.weight.abs()))
-      #       self.scale_w = 2 * self.clip_w / (self.QpW - self.QnW)
-      #     else:
-      #       self.clip_w = self.clip_w * .9 + .1 * (self.c1 * torch.sqrt(torch.mean(self.weight**2))) - (self.c2 * torch.mean(self.weight.abs()))
-      #       self.scale_w = self.scale_w * .9 + .1 * 2 * self.clip_w / (self.QpW - self.QnW)
-      #   w_q = self.weight
-      # else:
-      #   w_q = UniformQuantizeSawb.apply(
-      #     self.weight, self.QpW, self.QnW, self.scale_w, self.clip_w)
-      w_q = UniformQuantizeSawb.apply(self.weight, self.c1, self.c2, self.QpW, self.QnW)
+      if calibrate_phase:
+        with torch.no_grad():
+          if self.uname not in scale_library['w']: 
+            scale_library['w'][self.uname] = {}
+            scale_library['w'][self.uname]['clip_w'] = (self.c1 * torch.sqrt(torch.mean(self.weight**2))) - (self.c2 * torch.mean(self.weight.abs()))
+            scale_library['w'][self.uname]['scale_w']= 2 * scale_library['w'][self.uname]['clip_w'] / (self.QpW - self.QnW)
+          else:
+            scale_library['w'][self.uname]['clip_w'] = scale_library['w'][self.uname]['clip_w'] * .9 + .1 * ( (self.c1 * torch.sqrt(torch.mean(self.weight**2))) - (self.c2 * torch.mean(self.weight.abs())))
+            scale_library['w'][self.uname]['scale_w'] = scale_library['w'][self.uname]['scale_w'] * .9 + .1 * ( 2 * scale_library['w'][self.uname]['clip_w'] / (self.QpW - self.QnW))
+        w_q = self.weight
+      else:
+
+        w_q = UniformQuantizeSawb.apply(self.weight, self.QpW, self.QnW, scale_library['w'][self.uname]['scale_w'], scale_library['w'][self.uname]['clip_w'])
 
       if torch.min(input) < 0:
         self.QnA = -2 ** (self.abits - 1)
 
-      # if calibrate_phase:
-      #   with torch.no_grad():
-      #     if self.clip_a == -1:
-
-      #       self.clip_a = (self.c1 * torch.sqrt(torch.mean(input**2))) - (self.c2 * torch.mean(input.abs()))
-      #       self.scale_a = 2 * self.clip_a / (self.QpA - self.QnA)
-      #     else:
-      #       self.clip_a = self.clip_a * .9 + .1 * (self.c1 * torch.sqrt(torch.mean(input**2))) - (self.c2 * torch.mean(input.abs()))
-      #       self.scale_a = self.scale_a * .9 + .1 * 2 * self.clip_a / (self.QpA - self.QnA)
-      #   qinput = input
-      # else:
-      #   qinput = UniformQuantizeSawb.apply(
-      #     input, self.QpA, self.QnA, self.scale_a, self.clip_a)
-      qinput = UniformQuantizeSawb.apply(input, self.c1, self.c2, self.QpA, self.QnA)
+      if calibrate_phase:
+        with torch.no_grad():
+          if self.uname not in scale_library['a']:
+            scale_library['a'][self.uname] = {}
+            scale_library['a'][self.uname]['clip_a'] = (self.c1 * torch.sqrt(torch.mean(input**2))) - (self.c2 * torch.mean(input.abs()))
+            scale_library['a'][self.uname]['scale_a']= 2 * scale_library['a'][self.uname]['clip_a'] / (self.QpA - self.QnA)
+          else:
+            scale_library['a'][self.uname]['clip_a'] = scale_library['a'][self.uname]['clip_a'] * .9 + .1 * ( (self.c1 * torch.sqrt(torch.mean(input**2))) - (self.c2 * torch.mean(input.abs())))
+            scale_library['a'][self.uname]['scale_a'] = scale_library['a'][self.uname]['scale_a'] * .9 + .1 *  (2 * scale_library['a'][self.uname]['clip_a'] / (self.QpA - self.QnA))
+        qinput = input
+      else:
+        qinput = UniformQuantizeSawb.apply(input, self.QpA, self.QnA, scale_library['a'][self.uname]['scale_a'], scale_library['a'][self.uname]['clip_a'])
 
       # all
       output = F.conv2d(qinput, w_q, self.bias, self.stride,
@@ -361,20 +354,17 @@ class Conv2d_LUQ(nn.Conv2d):
       output = F.conv2d(input, self.weight, self.bias, self.stride,
                         self.padding, self.dilation, self.groups)
 
-    # if torch.isnan(output).any():
-    # import pdb; pdb.set_trace()
-    # if not calibrate_phase:
-    #   import pdb; pdb.set_trace()
 
     output = GradStochasticClippingQ.apply(
-       output, self.quantizeBwd, self.layerIdx, self.repeatBwd)
+       output, self.quantizeBwd, self.layerIdx, self.repeatBwd, self.uname)
     return output
 
 
 class GradStochasticClippingQ(Function):
 
   @staticmethod
-  def forward(ctx, x, quantizeBwd, layerIdx, repeatBwd):
+  def forward(ctx, x, quantizeBwd, layerIdx, repeatBwd, uname):
+    ctx.uname = uname
     ctx.save_for_backward(torch.tensor(quantizeBwd),
                           torch.tensor(layerIdx), torch.tensor(repeatBwd))
     return x
@@ -386,7 +376,18 @@ class GradStochasticClippingQ(Function):
       out = []
       for i in range(repeatBwd):
 
-        mx = torch.max(grad_output)
+        if calibrate_phase:
+          mx = torch.max(grad_output)
+          if ctx.uname not in scale_library['g']:
+            scale_library['g'][ctx.uname] = mx
+          else:
+            scale_library['g'][ctx.uname] = .9 * scale_library['g'][ctx.uname] + .1 * mx
+          return grad_output, None, None, None, None
+        else:
+          mx = scale_library['g'][ctx.uname]
+          grad_output = torch.clamp(grad_output, max = mx)
+
+
         bits = 4
         alpha = mx / 2**(2**bits - 1)
 
@@ -397,6 +398,8 @@ class GradStochasticClippingQ(Function):
 
         grad_input = torch.where(
             grad_abs < alpha, alpha * torch.sign(grad_output), grad_output)
+
+
         grad_input = torch.where(grad_abs < alphaEps, torch.tensor(
             [0], dtype=torch.float32, device=grad_output.device), grad_input)
 
@@ -416,7 +419,7 @@ class GradStochasticClippingQ(Function):
 
     else:
       grad_input = grad_output
-    return grad_input, None, None, None
+    return grad_input, None, None, None, None
 
 
 # end code from:
