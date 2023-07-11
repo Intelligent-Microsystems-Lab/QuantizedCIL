@@ -19,6 +19,7 @@ quantizeFwd = False
 quantizeBwd = False
 quantStoch = False
 quantCalibrate = False
+quantTrack = False
 
 scale_library = {'a': {}, 'w': {}, 'g': {}}
 

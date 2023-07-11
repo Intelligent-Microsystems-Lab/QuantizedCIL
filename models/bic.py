@@ -49,7 +49,7 @@ class BiC(BaseLearner):
     )
 
     lin_w, lin_b = quant.save_lin_params(self._network)
-    if self.args.quantizeTrack:
+    if quant.quantTrack:
         quant.place_track(self._network, track_layer_list, '', lin_w, lin_b)
     else:
       quant.place_quant(self._network, lin_w, lin_b)
@@ -103,7 +103,7 @@ class BiC(BaseLearner):
       self._network = self._network.module
     self._log_bias_params()
 
-    if self.args.quantizeTrack:
+    if quant.quantTrack:
         # save grads
         for lname in track_layer_list:
             if lname in quant.track_stats:
