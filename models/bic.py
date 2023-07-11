@@ -48,10 +48,11 @@ class BiC(BaseLearner):
         "Learning on {}-{}".format(self._known_classes, self._total_classes)
     )
 
-        lin_w, lin_b = quant.save_lin_params(self._network)
-        quant.place_quant(self._network, lin_w, lin_b)
-        if self.args.quantizeTrack:
-            quant.place_track(self._network, track_layer_list, '', lin_w, lin_b)
+    lin_w, lin_b = quant.save_lin_params(self._network)
+    if self.args.quantizeTrack:
+        quant.place_track(self._network, track_layer_list, '', lin_w, lin_b)
+    else:
+      quant.place_quant(self._network, lin_w, lin_b)
 
     if self._cur_task >= 1:
       train_dset, val_dset = data_manager.get_dataset_with_split(
