@@ -108,7 +108,7 @@ class BiC(BaseLearner):
         for lname in track_layer_list:
             if lname in quant.track_stats:
                 np.save('track_stats/' + datetime.now().strftime('%y_%m_%d_%H_%M') + '_' + self.args['dataset'] + '_' + self.args['model_name'] + '_' + str(self._cur_task) + lname + '.npy', torch.hstack(quant.track_stats[lname]).numpy())
-        quant.track_stats = {}
+        quant.track_stats = {'grads': {}, 'acts': {}, 'wgts': {}}
 
   def _run(self, train_loader, test_loader, optimizer, scheduler, stage):
     for epoch in range(1, epochs + 1):
