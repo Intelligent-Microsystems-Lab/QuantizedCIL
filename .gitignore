@@ -1,6 +1,7 @@
 # Added
 data/*
 logs/*
+results/*
 track_stats/*
 
 # Byte-compiled / optimized / DLL files
