@@ -55,7 +55,8 @@ class LwF(BaseLearner):
 
         lin_w, lin_b = quant.save_lin_params(self._network)
         quant.place_quant(self._network, lin_w, lin_b)
-        # quant.place_track(self._network, track_layer_list, '', lin_w, lin_b)
+        if self.args.quantizeTrack:
+            quant.place_track(self._network, track_layer_list, '', lin_w, lin_b)
 
         train_dataset = data_manager.get_dataset(
             np.arange(self._known_classes, self._total_classes),
@@ -116,11 +117,12 @@ class LwF(BaseLearner):
             )
             self._update_representation(train_loader, test_loader, optimizer, scheduler)
 
-        # # save grads
-        # for lname in track_layer_list:
-        #     if lname in quant.track_stats:
-        #         np.save('track_stats/' + datetime.now().strftime('%y_%m_%d_%H_%M') + '_' + self.args['dataset'] + '_' + self.args['model_name'] + '_' + str(self._cur_task) + lname + '.npy', torch.hstack(quant.track_stats[lname]).numpy())
-        # quant.track_stats = {}
+        if self.args.quantizeTrack:
+            # save grads
+            for lname in track_layer_list:
+                if lname in quant.track_stats:
+                    np.save('track_stats/' + datetime.now().strftime('%y_%m_%d_%H_%M') + '_' + self.args['dataset'] + '_' + self.args['model_name'] + '_' + str(self._cur_task) + lname + '.npy', torch.hstack(quant.track_stats[lname]).numpy())
+            quant.track_stats = {}
 
     def _init_train(self, train_loader, test_loader, optimizer, scheduler):
         prog_bar = tqdm(range(init_epoch))

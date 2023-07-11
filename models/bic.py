@@ -48,8 +48,8 @@ class BiC(BaseLearner):
 
         lin_w, lin_b = quant.save_lin_params(self._network)
         quant.place_quant(self._network, lin_w, lin_b)
-        # quant.place_track(self._network, track_layer_list, '', lin_w, lin_b)
-        # import pdb; pdb.set_trace()
+        if self.args.quantizeTrack:
+            quant.place_track(self._network, track_layer_list, '', lin_w, lin_b)
 
         if self._cur_task >= 1:
             train_dset, val_dset = data_manager.get_dataset_with_split(
@@ -100,11 +100,12 @@ class BiC(BaseLearner):
             self._network = self._network.module
         self._log_bias_params()
 
-        # # save grads
-        # for lname in track_layer_list:
-        #     if lname in quant.track_stats:
-        #         np.save('track_stats/' + datetime.now().strftime('%y_%m_%d_%H_%M') + '_' + self.args['dataset'] + '_' + self.args['model_name'] + '_' + str(self._cur_task) + lname + '.npy', torch.hstack(quant.track_stats[lname]).numpy())
-        # quant.track_stats = {}
+        if self.args.quantizeTrack:
+            # save grads
+            for lname in track_layer_list:
+                if lname in quant.track_stats:
+                    np.save('track_stats/' + datetime.now().strftime('%y_%m_%d_%H_%M') + '_' + self.args['dataset'] + '_' + self.args['model_name'] + '_' + str(self._cur_task) + lname + '.npy', torch.hstack(quant.track_stats[lname]).numpy())
+            quant.track_stats = {}
 
     def _run(self, train_loader, test_loader, optimizer, scheduler, stage):
         for epoch in range(1, epochs + 1):
