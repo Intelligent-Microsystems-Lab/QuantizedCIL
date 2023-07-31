@@ -13,13 +13,15 @@ from torch.autograd.function import InplaceFunction
 
 from convs.linears import SimpleLinear
 
-track_stats = {'grads': {}, 'acts': {}, 'wgts': {}}
+track_stats = {'grads': {}, 'acts': {}, 'wgts': {}, 'grad_stats':{}}
 calibrate_phase = False
 quantizeFwd = False
 quantizeBwd = False
 quantStoch = False
 quantCalibrate = False
 quantTrack = False
+
+quantGradMxScale = 1.
 
 scale_library = {'a': {}, 'w': {}, 'g': {}}
 
@@ -30,6 +32,7 @@ def place_track(m, layer_list, c_path, lin_w, lin_b):
     if isinstance(target_attr, nn.Conv2d):
       if not hasattr(target_attr, 'c1'):
         if c_path + '_' + attr_str in layer_list:
+          track_stats['grad_stats'][c_path + '_' + attr_str] = {'max':[], 'min':[],'norm':[], 'mean':[]}
           track_stats['grads'][c_path + '_' + attr_str] = []
           track_stats['acts'][c_path + '_' + attr_str] = []
           track_stats['wgts'][c_path + '_' + attr_str] = []
@@ -47,6 +50,7 @@ def place_track(m, layer_list, c_path, lin_w, lin_b):
     if isinstance(target_attr, nn.Linear) or isinstance(target_attr,
                                                         SimpleLinear):
       if c_path + '_' + attr_str in layer_list:
+        track_stats['grad_stats'][c_path + '_' + attr_str] = {'max':[], 'min':[],'norm':[], 'mean':[]}
         track_stats['grads'][c_path + '_' + attr_str] = []
         track_stats['acts'][c_path + '_' + attr_str] = []
         track_stats['wgts'][c_path + '_' + attr_str] = []
@@ -172,6 +176,20 @@ class GradTrack(Function):
     size_total = len(grad_output.flatten())
     track_stats['grads'][ctx.name].append(grad_output.flatten(
     )[torch.randint(size_total, (int(size_total * .01),))].cpu())
+
+
+    # grad norm
+    track_stats['grad_stats'][ctx.name]['norm'].append(torch.linalg.vector_norm(grad_output.flatten()).cpu())
+
+    # grad max
+    track_stats['grad_stats'][ctx.name]['max'].append(grad_output.max().cpu())
+
+    # grad min
+    track_stats['grad_stats'][ctx.name]['min'].append(grad_output.min().cpu())
+
+    # grad mean
+    track_stats['grad_stats'][ctx.name]['mean'].append(grad_output.mean().cpu())
+
 
     return grad_output, None
 
@@ -478,7 +496,7 @@ class GradStochasticClippingQ(Function):
 
         if quantCalibrate:
           if calibrate_phase:
-            mx = torch.max(grad_output)
+            mx = torch.max(grad_output.abs()) * quantGradMxScale
             if ctx.uname not in scale_library['g']:
               scale_library['g'][ctx.uname] = mx
             else:
@@ -487,9 +505,9 @@ class GradStochasticClippingQ(Function):
             return grad_output, None, None, None, None
           else:
             mx = scale_library['g'][ctx.uname]
-            grad_output = torch.clamp(grad_output, max=mx)
+            grad_output = torch.clamp(grad_output, max=mx, min=-1*mx)
         else:
-          mx = torch.max(grad_output)
+          mx = torch.max(grad_output.abs())
 
         bits = 4
         alpha = mx / 2**(2**bits - 1)
@@ -530,4 +548,8 @@ class GradStochasticClippingQ(Function):
 
     else:
       grad_input = grad_output
+
+    # if torch.isnan(grad_input).any():
+    #   import pdb; pdb.set_trace()
+
     return grad_input, None, None, None, None

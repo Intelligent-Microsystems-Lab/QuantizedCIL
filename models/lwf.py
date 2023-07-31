@@ -5,6 +5,7 @@ from torch import nn
 from torch.serialization import load
 from tqdm import tqdm
 from torch import optim
+import copy
 from torch.nn import functional as F
 from torch.utils.data import DataLoader
 from utils.inc_net import IncrementalNet
@@ -34,7 +35,7 @@ lamda = 3
 
 track_layer_list = ['_convnet_conv_1_3x3', '_convnet_stage_1_2_conv_b',
                     '_convnet_stage_2_4_conv_a', '_convnet_stage_3_3_conv_a', '_fc']
-
+grad_quant_bias = {}
 
 class LwF(BaseLearner):
   def __init__(self, args):
@@ -121,12 +122,15 @@ class LwF(BaseLearner):
       self._update_representation(
           train_loader, test_loader, optimizer, scheduler)
 
+    
     if quant.quantTrack:
-            # save grads
+        # save grads
         for lname in track_layer_list:
-            if lname in quant.track_stats:
-                np.save('track_stats/' + datetime.now().strftime('%y_%m_%d_%H_%M') + '_' + self.args['dataset'] + '_' + self.args['model_name'] + '_' + str(self._cur_task) + lname + '.npy', torch.hstack(quant.track_stats[lname]).numpy())
-        quant.track_stats = {'grads': {}, 'acts': {}, 'wgts': {}}
+            if lname in quant.track_stats['grads']:
+                np.save('track_stats/' + datetime.now().strftime('%y_%m_%d_%H_%M') + '_' + self.args['dataset'] + '_' + self.args['model_name'] + '_' + str(self._cur_task) + lname + '.npy', torch.hstack(quant.track_stats['grads'][lname]).numpy())
+            if lname in quant.track_stats['grads']:
+                for stat_name in ['max', 'min', 'mean', 'norm']:
+                    np.save('track_stats/' + datetime.now().strftime('%y_%m_%d_%H_%M') + '_' + self.args['dataset'] + '_' + self.args['model_name'] + '_' + str(self._cur_task) + lname + '_'+stat_name+'.npy', torch.hstack(quant.track_stats['grad_stats'][lname][stat_name]).numpy())
 
   def _init_train(self, train_loader, test_loader, optimizer, scheduler):
     prog_bar = tqdm(range(init_epoch))
@@ -136,13 +140,38 @@ class LwF(BaseLearner):
       correct, total = 0, 0
       for i, (_, inputs, targets) in enumerate(train_loader):
         inputs, targets = inputs.to(self._device), targets.to(self._device)
-        logits = self._network(inputs)["logits"]
 
+        # unquantized tracking
+        quant.calibrate_phase = True
+        logits = self._network(inputs)["logits"]
         loss = F.cross_entropy(logits, targets)
         optimizer.zero_grad()
         loss.backward()
+
+        # save all gradients
+        unquantized_grad = {}
+        for k, param in self._network.named_parameters():
+          if 'weight' in k:
+            if param.grad is not None:
+              unquantized_grad[k] = copy.deepcopy(param.grad)
+
         optimizer.step()
         losses += loss.item()
+
+        # quantized tracking
+        quant.calibrate_phase = False
+        logits = self._network(inputs)["logits"]
+        loss = F.cross_entropy(logits, targets)
+        optimizer.zero_grad()
+        loss.backward()
+
+        for k, param in self._network.named_parameters():
+          if 'weight' in k:
+            if param.grad is not None:
+              if k in grad_quant_bias:
+                grad_quant_bias[k] = .9 * grad_quant_bias[k] +  .1 * torch.mean(param.grad - unquantized_grad[k])
+              else:
+                grad_quant_bias[k] = torch.mean(unquantized_grad[k] - param.grad)
 
         _, preds = torch.max(logits, dim=1)
         correct += preds.eq(targets.expand_as(preds)).cpu().sum()
@@ -198,6 +227,12 @@ class LwF(BaseLearner):
 
         optimizer.zero_grad()
         loss.backward()
+
+        # for k, param in self._network.named_parameters():
+        #   if 'weight' in k:
+        #     if param.grad is not None:
+        #       param.grad += grad_quant_bias[k]
+
         optimizer.step()
         losses += loss.item()
 
