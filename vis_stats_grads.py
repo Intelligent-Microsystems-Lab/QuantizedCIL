@@ -56,7 +56,7 @@ def prep_plot(data, posi, posj, title, xlabel, ylabel, range_y):
 
   # data = data[data != 0]
   # ax[posi][posj].set_yscale('log')
-  ax[posi][posj].plot(data[1:], lw = gen_linewidth)
+  ax[posi][posj].plot(data[4:], lw = gen_linewidth)
   ax[posi][posj].set_ylim(range_y[0], range_y[1])
   # ax[posi][posj].hist(data, range = range_g, bins=50)
 
