@@ -127,6 +127,7 @@ class BaseLearner(object):
       return (self._data_memory, self._targets_memory)
 
   def _compute_accuracy(self, model, loader):
+    curr_mode = "train" if model.training else "eval"
     model.eval()
     correct, total = 0, 0
     for i, (_, inputs, targets) in enumerate(loader):
@@ -137,6 +138,10 @@ class BaseLearner(object):
       correct += (predicts.cpu() == targets).sum()
       total += len(targets)
 
+    if curr_mode == "train":
+      model.train()
+    elif curr_mode == "eval":
+      model.eval()
     return np.around(tensor2numpy(correct) * 100 / total, decimals=2)
 
   def _eval_cnn(self, loader):
