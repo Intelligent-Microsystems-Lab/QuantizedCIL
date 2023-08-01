@@ -12,7 +12,7 @@ from utils.inc_net import IncrementalNetWithBias
 from datetime import datetime
 import quant
 
-epochs = 1 # 170
+epochs = 170
 lrate = 0.1
 milestones = [60, 100, 140]
 lrate_decay = 0.1
@@ -226,18 +226,20 @@ class BiC(BaseLearner):
         losses += loss.item()
         train_acc = self._compute_accuracy(self._network, train_loader)
         test_acc = self._compute_accuracy(self._network, test_loader)
+        self._network.train()
+
         quant.track_stats["train_acc"].append(train_acc)
         quant.track_stats["test_acc"].append(test_acc)
         quant.track_stats["loss"].append(float(loss))
-        info = "{} => Task {}, Epoch {}/{} => Loss {:.3f}, Train_accy {:.3f}, Test_accy {:.3f}".format(
-            stage,
-            self._cur_task,
-            epoch,
-            epochs,
-            losses / len(train_loader),
-            train_acc,
-            test_acc,
-        )
+      info = "{} => Task {}, Epoch {}/{} => Loss {:.3f}, Train_accy {:.3f}, Test_accy {:.3f}".format(
+          stage,
+          self._cur_task,
+          epoch,
+          epochs,
+          losses / len(train_loader),
+          train_acc,
+          test_acc,
+      )
 
       scheduler.step()
       logging.info(info)

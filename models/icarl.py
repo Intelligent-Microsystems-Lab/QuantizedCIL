@@ -19,14 +19,14 @@ import quant
 
 EPSILON = 1e-8
 
-init_epoch = 1 # 200
+init_epoch = 170
 init_lr = 0.1
 init_milestones = [60, 100, 140]
 init_lr_decay = 0.1
 init_weight_decay = 2e-4 # 0.0005
 
 
-epochs = 1 # 170
+epochs = 170
 lrate = 0.1
 milestones = [60, 100, 140]
 lrate_decay = 0.1
@@ -157,36 +157,36 @@ class iCaRL(BaseLearner):
         inputs, targets = inputs.to(self._device), targets.to(self._device)
 
         # unquantized tracking
-        quant.calibrate_phase = True
+        # quant.calibrate_phase = True
         logits = self._network(inputs)["logits"]
         loss = F.cross_entropy(logits, targets)
         optimizer.zero_grad()
         loss.backward()
 
-        # save all gradients
-        unquantized_grad = {}
-        for k, param in self._network.named_parameters():
-          if 'weight' in k:
-            if param.grad is not None:
-              unquantized_grad[k] = copy.deepcopy(param.grad)
+        # # save all gradients
+        # unquantized_grad = {}
+        # for k, param in self._network.named_parameters():
+        #   if 'weight' in k:
+        #     if param.grad is not None:
+        #       unquantized_grad[k] = copy.deepcopy(param.grad)
 
         optimizer.step()
         losses += loss.item()
 
         # quantized tracking
-        quant.calibrate_phase = False
-        logits = self._network(inputs)["logits"]
-        loss = F.cross_entropy(logits, targets)
-        optimizer.zero_grad()
-        loss.backward()
+        # quant.calibrate_phase = False
+        # logits = self._network(inputs)["logits"]
+        # loss = F.cross_entropy(logits, targets)
+        # optimizer.zero_grad()
+        # loss.backward()
 
-        for k, param in self._network.named_parameters():
-            if 'weight' in k:
-              if param.grad is not None:
-                if k in grad_quant_bias:
-                  grad_quant_bias[k] = .9 * grad_quant_bias[k] +  .1 * torch.mean(param.grad - unquantized_grad[k])
-                else:
-                  grad_quant_bias[k] = torch.mean(unquantized_grad[k] - param.grad)
+        # for k, param in self._network.named_parameters():
+        #     if 'weight' in k:
+        #       if param.grad is not None:
+        #         if k in grad_quant_bias:
+        #           grad_quant_bias[k] = .9 * grad_quant_bias[k] +  .1 * torch.mean(param.grad - unquantized_grad[k])
+        #         else:
+        #           grad_quant_bias[k] = torch.mean(unquantized_grad[k] - param.grad)
         
         _, preds = torch.max(logits, dim=1)
         local_correct = preds.eq(targets.expand_as(preds)).cpu().sum()
@@ -199,17 +199,20 @@ class iCaRL(BaseLearner):
 
         # if epoch % 5 == 0:
         test_acc = self._compute_accuracy(self._network, test_loader)
+        self._network.train()
+
         quant.track_stats["train_acc"].append(local_train_acc)
         quant.track_stats["test_acc"].append(test_acc)
         quant.track_stats["loss"].append(float(loss))
-        info = "Task {}, Epoch {}/{} => Loss {:.3f}, Train_accy {:.2f}, Test_accy {:.2f}".format(
-            self._cur_task,
-            epoch + 1,
-            init_epoch,
-            losses / len(train_loader),
-            train_acc,
-            test_acc,
-        )
+
+      info = "Task {}, Epoch {}/{} => Loss {:.3f}, Train_accy {:.2f}, Test_accy {:.2f}".format(
+          self._cur_task,
+          epoch + 1,
+          init_epoch,
+          losses / len(train_loader),
+          train_acc,
+          test_acc,
+      )
       # else:
       #   info = "Task {}, Epoch {}/{} => Loss {:.3f}, Train_accy {:.2f}".format(
       #       self._cur_task,
@@ -260,17 +263,20 @@ class iCaRL(BaseLearner):
         train_acc = np.around(tensor2numpy(correct) * 100 / total, decimals=2)
         # if epoch % 5 == 0:
         test_acc = self._compute_accuracy(self._network, test_loader)
+        self._network.train()
+
         quant.track_stats["train_acc"].append(train_acc)
         quant.track_stats["test_acc"].append(test_acc)
         quant.track_stats["loss"].append(float(loss))
-        info = "Task {}, Epoch {}/{} => Loss {:.3f}, Train_accy {:.2f}, Test_accy {:.2f}".format(
-            self._cur_task,
-            epoch + 1,
-            epochs,
-            losses / len(train_loader),
-            train_acc,
-            test_acc,
-        )
+
+      info = "Task {}, Epoch {}/{} => Loss {:.3f}, Train_accy {:.2f}, Test_accy {:.2f}".format(
+          self._cur_task,
+          epoch + 1,
+          epochs,
+          losses / len(train_loader),
+          train_acc,
+          test_acc,
+      )
       # else:
       #   info = "Task {}, Epoch {}/{} => Loss {:.3f}, Train_accy {:.2f}".format(
       #       self._cur_task,
