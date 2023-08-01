@@ -12,7 +12,7 @@ from utils.inc_net import IncrementalNetWithBias
 from datetime import datetime
 import quant
 
-epochs = 170
+epochs = 1 # 170
 lrate = 0.1
 milestones = [60, 100, 140]
 lrate_decay = 0.1
@@ -34,6 +34,7 @@ class BiC(BaseLearner):
         args["convnet_type"], False, bias_correction=True
     )
     self._class_means = None
+    self.date_str = datetime.now().strftime('%y_%m_%d_%H_%M')
 
   def after_task(self):
     self._old_network = self._network.copy().freeze()
@@ -107,12 +108,14 @@ class BiC(BaseLearner):
 
     if quant.quantTrack:
         # save grads
+        for gen_stats in ['train_acc', 'test_acc', 'loss']:
+          np.save('track_stats/' + self.date_str + '_' + self.args['dataset'] + '_' + self.args['model_name'] + '_' + str(self._cur_task) + '_'+gen_stats+'.npy', quant.track_stats[gen_stats])
         for lname in track_layer_list:
             if lname in quant.track_stats['grads']:
-                np.save('track_stats/' + datetime.now().strftime('%y_%m_%d_%H_%M') + '_' + self.args['dataset'] + '_' + self.args['model_name'] + '_' + str(self._cur_task) + lname + '.npy', torch.hstack(quant.track_stats['grads'][lname]).numpy())
+                np.save('track_stats/' + self.date_str + '_' + self.args['dataset'] + '_' + self.args['model_name'] + '_' + str(self._cur_task) + lname + '.npy', torch.hstack(quant.track_stats['grads'][lname]).numpy())
             if lname in quant.track_stats['grads']:
                 for stat_name in ['max', 'min', 'mean', 'norm']:
-                    np.save('track_stats/' + datetime.now().strftime('%y_%m_%d_%H_%M') + '_' + self.args['dataset'] + '_' + self.args['model_name'] + '_' + str(self._cur_task) + lname + '_'+stat_name+'.npy', torch.hstack(quant.track_stats['grad_stats'][lname][stat_name]).numpy())
+                    np.save('track_stats/' + self.date_str + '_' + self.args['dataset'] + '_' + self.args['model_name'] + '_' + str(self._cur_task) + lname + '_'+stat_name+'.npy', torch.hstack(quant.track_stats['grad_stats'][lname][stat_name]).numpy())
 
   def _run(self, train_loader, test_loader, optimizer, scheduler, stage):
     for epoch in range(1, epochs + 1):
@@ -225,6 +228,7 @@ class BiC(BaseLearner):
         test_acc = self._compute_accuracy(self._network, test_loader)
         quant.track_stats["train_acc"].append(train_acc)
         quant.track_stats["test_acc"].append(test_acc)
+        quant.track_stats["loss"].append(float(loss))
         info = "{} => Task {}, Epoch {}/{} => Loss {:.3f}, Train_accy {:.3f}, Test_accy {:.3f}".format(
             stage,
             self._cur_task,

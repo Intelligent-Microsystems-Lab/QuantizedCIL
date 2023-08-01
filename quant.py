@@ -13,7 +13,7 @@ from torch.autograd.function import InplaceFunction
 
 from convs.linears import SimpleLinear
 
-track_stats = {'grads': {}, 'acts': {}, 'wgts': {}, 'grad_stats':{}}
+track_stats = {'grads': {}, 'acts': {}, 'wgts': {}, 'grad_stats':{}, 'test_acc':[], 'train_acc':[], 'loss':[]}
 calibrate_phase = False
 quantizeFwd = False
 quantizeBwd = False
@@ -27,6 +27,9 @@ scale_library = {'a': {}, 'w': {}, 'g': {}}
 
 
 def place_track(m, layer_list, c_path, lin_w, lin_b):
+  track_stats['test_acc'] = []
+  track_stats['train_acc'] = []
+  track_stats['loss'] = []
   for attr_str in dir(m):
     target_attr = getattr(m, attr_str)
     if isinstance(target_attr, nn.Conv2d):
