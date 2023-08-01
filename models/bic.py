@@ -221,21 +221,21 @@ class BiC(BaseLearner):
 
 
         losses += loss.item()
+        train_acc = self._compute_accuracy(self._network, train_loader)
+        test_acc = self._compute_accuracy(self._network, test_loader)
+        quant.track_stats["train_acc"].append(train_acc)
+        quant.track_stats["test_acc"].append(test_acc)
+        info = "{} => Task {}, Epoch {}/{} => Loss {:.3f}, Train_accy {:.3f}, Test_accy {:.3f}".format(
+            stage,
+            self._cur_task,
+            epoch,
+            epochs,
+            losses / len(train_loader),
+            train_acc,
+            test_acc,
+        )
 
       scheduler.step()
-      train_acc = self._compute_accuracy(self._network, train_loader)
-      test_acc = self._compute_accuracy(self._network, test_loader)
-      quant.track_stats["train_acc"].append(train_acc)
-      quant.track_stats["test_acc"].append(test_acc)
-      info = "{} => Task {}, Epoch {}/{} => Loss {:.3f}, Train_accy {:.3f}, Test_accy {:.3f}".format(
-          stage,
-          self._cur_task,
-          epoch,
-          epochs,
-          losses / len(train_loader),
-          train_acc,
-          test_acc,
-      )
       logging.info(info)
 
   def _stage1_training(self, train_loader, test_loader):

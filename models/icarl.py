@@ -186,24 +186,26 @@ class iCaRL(BaseLearner):
                   grad_quant_bias[k] = torch.mean(unquantized_grad[k] - param.grad)
         
         _, preds = torch.max(logits, dim=1)
+        local_correct = preds.eq(targets.expand_as(preds)).cpu().sum()
         correct += preds.eq(targets.expand_as(preds)).cpu().sum()
         total += len(targets)
 
-      scheduler.step()
-      train_acc = np.around(tensor2numpy(correct) * 100 / total, decimals=2)
+      
+        train_acc = np.around(tensor2numpy(correct) * 100 / total, decimals=2)
+        local_train_acc = np.around(tensor2numpy(local_correct) * 100 / len(targets), decimals=2)
 
-      # if epoch % 5 == 0:
-      test_acc = self._compute_accuracy(self._network, test_loader)
-      quant.track_stats["train_acc"].append(train_acc)
-      quant.track_stats["test_acc"].append(test_acc)
-      info = "Task {}, Epoch {}/{} => Loss {:.3f}, Train_accy {:.2f}, Test_accy {:.2f}".format(
-          self._cur_task,
-          epoch + 1,
-          init_epoch,
-          losses / len(train_loader),
-          train_acc,
-          test_acc,
-      )
+        # if epoch % 5 == 0:
+        test_acc = self._compute_accuracy(self._network, test_loader)
+        quant.track_stats["train_acc"].append(local_train_acc)
+        quant.track_stats["test_acc"].append(test_acc)
+        info = "Task {}, Epoch {}/{} => Loss {:.3f}, Train_accy {:.2f}, Test_accy {:.2f}".format(
+            self._cur_task,
+            epoch + 1,
+            init_epoch,
+            losses / len(train_loader),
+            train_acc,
+            test_acc,
+        )
       # else:
       #   info = "Task {}, Epoch {}/{} => Loss {:.3f}, Train_accy {:.2f}".format(
       #       self._cur_task,
@@ -212,6 +214,7 @@ class iCaRL(BaseLearner):
       #       losses / len(train_loader),
       #       train_acc,
       #   )
+      scheduler.step()
       prog_bar.set_description(info)
 
     logging.info(info)
