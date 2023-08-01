@@ -225,6 +225,8 @@ class BiC(BaseLearner):
       scheduler.step()
       train_acc = self._compute_accuracy(self._network, train_loader)
       test_acc = self._compute_accuracy(self._network, test_loader)
+      quant.track_stats["train_acc"].append(train_acc)
+      quant.track_stats["test_acc"].append(test_acc)
       info = "{} => Task {}, Epoch {}/{} => Loss {:.3f}, Train_accy {:.3f}, Test_accy {:.3f}".format(
           stage,
           self._cur_task,

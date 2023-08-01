@@ -192,24 +192,26 @@ class iCaRL(BaseLearner):
       scheduler.step()
       train_acc = np.around(tensor2numpy(correct) * 100 / total, decimals=2)
 
-      if epoch % 5 == 0:
-        test_acc = self._compute_accuracy(self._network, test_loader)
-        info = "Task {}, Epoch {}/{} => Loss {:.3f}, Train_accy {:.2f}, Test_accy {:.2f}".format(
-            self._cur_task,
-            epoch + 1,
-            init_epoch,
-            losses / len(train_loader),
-            train_acc,
-            test_acc,
-        )
-      else:
-        info = "Task {}, Epoch {}/{} => Loss {:.3f}, Train_accy {:.2f}".format(
-            self._cur_task,
-            epoch + 1,
-            init_epoch,
-            losses / len(train_loader),
-            train_acc,
-        )
+      # if epoch % 5 == 0:
+      test_acc = self._compute_accuracy(self._network, test_loader)
+      quant.track_stats["train_acc"].append(train_acc)
+      quant.track_stats["test_acc"].append(test_acc)
+      info = "Task {}, Epoch {}/{} => Loss {:.3f}, Train_accy {:.2f}, Test_accy {:.2f}".format(
+          self._cur_task,
+          epoch + 1,
+          init_epoch,
+          losses / len(train_loader),
+          train_acc,
+          test_acc,
+      )
+      # else:
+      #   info = "Task {}, Epoch {}/{} => Loss {:.3f}, Train_accy {:.2f}".format(
+      #       self._cur_task,
+      #       epoch + 1,
+      #       init_epoch,
+      #       losses / len(train_loader),
+      #       train_acc,
+      #   )
       prog_bar.set_description(info)
 
     logging.info(info)
@@ -249,24 +251,26 @@ class iCaRL(BaseLearner):
 
       scheduler.step()
       train_acc = np.around(tensor2numpy(correct) * 100 / total, decimals=2)
-      if epoch % 5 == 0:
-        test_acc = self._compute_accuracy(self._network, test_loader)
-        info = "Task {}, Epoch {}/{} => Loss {:.3f}, Train_accy {:.2f}, Test_accy {:.2f}".format(
-            self._cur_task,
-            epoch + 1,
-            epochs,
-            losses / len(train_loader),
-            train_acc,
-            test_acc,
-        )
-      else:
-        info = "Task {}, Epoch {}/{} => Loss {:.3f}, Train_accy {:.2f}".format(
-            self._cur_task,
-            epoch + 1,
-            epochs,
-            losses / len(train_loader),
-            train_acc,
-        )
+      # if epoch % 5 == 0:
+      test_acc = self._compute_accuracy(self._network, test_loader)
+      quant.track_stats["train_acc"].append(train_acc)
+      quant.track_stats["test_acc"].append(test_acc)
+      info = "Task {}, Epoch {}/{} => Loss {:.3f}, Train_accy {:.2f}, Test_accy {:.2f}".format(
+          self._cur_task,
+          epoch + 1,
+          epochs,
+          losses / len(train_loader),
+          train_acc,
+          test_acc,
+      )
+      # else:
+      #   info = "Task {}, Epoch {}/{} => Loss {:.3f}, Train_accy {:.2f}".format(
+      #       self._cur_task,
+      #       epoch + 1,
+      #       epochs,
+      #       losses / len(train_loader),
+      #       train_acc,
+      #   )
       prog_bar.set_description(info)
     logging.info(info)
 
