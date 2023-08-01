@@ -123,7 +123,43 @@ class BiC(BaseLearner):
 
 
         if self._cur_task == 0:
-          quant.calibrate_phase = True
+          # quant.calibrate_phase = True
+          # logits = self._network(inputs)["logits"]
+          # if stage == "training":
+          #   clf_loss = F.cross_entropy(logits, targets)
+          #   if self._old_network is not None:
+          #     old_logits = self._old_network(inputs)["logits"].detach()
+          #     hat_pai_k = F.softmax(old_logits / T, dim=1)
+          #     log_pai_k = F.log_softmax(
+          #         logits[:, : self._known_classes] / T, dim=1
+          #     )
+          #     distill_loss = -torch.mean(
+          #         torch.sum(hat_pai_k * log_pai_k, dim=1)
+          #     )
+          #     loss = distill_loss * self.lamda + clf_loss * (1 - self.lamda)
+          #   else:
+          #     loss = clf_loss
+          # elif stage == "bias_correction":
+          #   loss = F.cross_entropy(torch.softmax(logits, dim=1), targets)
+          # else:
+          #   raise NotImplementedError()
+
+          # optimizer.zero_grad()
+          # loss.backward()
+
+          # # save all gradients
+          # unquantized_grad = {}
+          # for k, param in self._network.named_parameters():
+          #   if 'weight' in k:
+          #     if param.grad is not None:
+          #       unquantized_grad[k] = copy.deepcopy(param.grad)
+
+          # optimizer.step()
+
+
+
+
+          # quant.calibrate_phase = False
           logits = self._network(inputs)["logits"]
           if stage == "training":
             clf_loss = F.cross_entropy(logits, targets)
@@ -147,50 +183,14 @@ class BiC(BaseLearner):
           optimizer.zero_grad()
           loss.backward()
 
-          # save all gradients
-          unquantized_grad = {}
-          for k, param in self._network.named_parameters():
-            if 'weight' in k:
-              if param.grad is not None:
-                unquantized_grad[k] = copy.deepcopy(param.grad)
 
-          optimizer.step()
-
-
-
-
-          quant.calibrate_phase = False
-          logits = self._network(inputs)["logits"]
-          if stage == "training":
-            clf_loss = F.cross_entropy(logits, targets)
-            if self._old_network is not None:
-              old_logits = self._old_network(inputs)["logits"].detach()
-              hat_pai_k = F.softmax(old_logits / T, dim=1)
-              log_pai_k = F.log_softmax(
-                  logits[:, : self._known_classes] / T, dim=1
-              )
-              distill_loss = -torch.mean(
-                  torch.sum(hat_pai_k * log_pai_k, dim=1)
-              )
-              loss = distill_loss * self.lamda + clf_loss * (1 - self.lamda)
-            else:
-              loss = clf_loss
-          elif stage == "bias_correction":
-            loss = F.cross_entropy(torch.softmax(logits, dim=1), targets)
-          else:
-            raise NotImplementedError()
-
-          optimizer.zero_grad()
-          loss.backward()
-
-
-          for k, param in self._network.named_parameters():
-            if 'weight' in k:
-              if param.grad is not None:
-                if k in grad_quant_bias:
-                  grad_quant_bias[k] = .9 * grad_quant_bias[k] +  .1 * torch.mean(param.grad - unquantized_grad[k])
-                else:
-                  grad_quant_bias[k] = torch.mean(unquantized_grad[k] - param.grad)
+          # for k, param in self._network.named_parameters():
+          #   if 'weight' in k:
+          #     if param.grad is not None:
+          #       if k in grad_quant_bias:
+          #         grad_quant_bias[k] = .9 * grad_quant_bias[k] +  .1 * torch.mean(param.grad - unquantized_grad[k])
+          #       else:
+          #         grad_quant_bias[k] = torch.mean(unquantized_grad[k] - param.grad)
 
         else:
 
