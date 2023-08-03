@@ -17,9 +17,10 @@ track_stats = {'grads': {}, 'acts': {}, 'wgts': {}, 'grad_stats':{}, 'test_acc':
 calibrate_phase = False
 quantizeFwd = False
 quantizeBwd = False
-quantStoch = False
-quantCalibrate = False
+quantGradRound = "standard"
+quantCalibrate = "max"
 quantTrack = False
+quantBits = 4
 
 quantGradMxScale = 1.
 
@@ -257,8 +258,8 @@ class Linear_LUQ(nn.Linear):
 
     self.alpha = Parameter(torch.tensor([1], dtype=torch.float32))
     self.beta = Parameter(torch.tensor([1], dtype=torch.float32))
-    self.abits = 4
-    self.wbits = 4
+    self.abits = quantBits
+    self.wbits = quantBits
 
     self.QnW = -2 ** (self.wbits - 1)
     self.QpW = 2 ** (self.wbits - 1)
@@ -276,7 +277,7 @@ class Linear_LUQ(nn.Linear):
 
     self.c1 = 12.1
     self.c2 = 12.2
-    self.stochastic = quantStoch
+    self.stochastic = quantGradRound
     self.calibrate = quantCalibrate
     self.repeatBwd = 1
 
@@ -285,7 +286,7 @@ class Linear_LUQ(nn.Linear):
   def forward(self, input):
 
     if self.quantizeFwd:
-      if self.calibrate:
+      if False: # self.calibrate: TODO: fix
         if calibrate_phase:
           with torch.no_grad():
             if self.uname not in scale_library['w']:
@@ -320,7 +321,7 @@ class Linear_LUQ(nn.Linear):
       if torch.min(input) < 0:
         self.QnA = -2 ** (self.abits - 1)
 
-      if self.calibrate:
+      if False: # self.calibrate: TODO: fix
         if calibrate_phase:
           with torch.no_grad():
             if self.uname not in scale_library['a']:
@@ -375,8 +376,8 @@ class Conv2d_LUQ(nn.Conv2d):
 
     self.alpha = Parameter(torch.tensor([1], dtype=torch.float32))
     self.beta = Parameter(torch.tensor([1], dtype=torch.float32))
-    self.abits = 4
-    self.wbits = 4
+    self.abits = quantBits
+    self.wbits = quantBits
 
     self.QnW = -2 ** (self.wbits - 1)
     self.QpW = 2 ** (self.wbits - 1)
@@ -394,7 +395,7 @@ class Conv2d_LUQ(nn.Conv2d):
 
     self.c1 = 12.1
     self.c2 = 12.2
-    self.stochastic = quantStoch
+    self.stochastic = quantGradRound
     self.calibrate = quantCalibrate
     self.repeatBwd = 1
 
@@ -403,7 +404,7 @@ class Conv2d_LUQ(nn.Conv2d):
   def forward(self, input):
 
     if self.quantizeFwd:
-      if self.calibrate:
+      if False: #self.calibrate: TODO fix
         if calibrate_phase:
           with torch.no_grad():
             if self.uname not in scale_library['w']:
@@ -438,7 +439,7 @@ class Conv2d_LUQ(nn.Conv2d):
       if torch.min(input) < 0:
         self.QnA = -2 ** (self.abits - 1)
 
-      if self.calibrate:
+      if False: # self.calibrate: TODO fix
         if calibrate_phase:
           with torch.no_grad():
             if self.uname not in scale_library['a']:
@@ -512,10 +513,10 @@ class GradStochasticClippingQ(Function):
         else:
           mx = torch.max(grad_output.abs())
 
-        bits = 4
+        bits = quantBits
         alpha = mx / 2**(2**bits - 1)
 
-        if quantStoch:
+        if quantGradRound == "stochastic":
           alphaEps = alpha * \
               torch.rand(grad_output.shape, device=grad_output.device)
         else:
@@ -531,7 +532,7 @@ class GradStochasticClippingQ(Function):
 
         grad_inputQ = grad_input.clone()
 
-        if quantStoch:
+        if quantGradRound == "stochastic":
           noise = (2 ** torch.floor(torch.log2((grad_inputQ.abs() / alpha)))
                    ) * grad_inputQ.new(grad_inputQ.shape).uniform_(-0.5, 0.5)
         else:
