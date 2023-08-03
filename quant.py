@@ -13,6 +13,8 @@ from torch.autograd.function import InplaceFunction
 
 from convs.linears import SimpleLinear
 
+from squant_function import SQuant_func
+
 track_stats = {'grads': {}, 'acts': {}, 'wgts': {}, 'grad_stats':{}, 'test_acc':[], 'train_acc':[], 'loss':[]}
 calibrate_phase = False
 quantizeFwd = False
@@ -20,10 +22,12 @@ quantizeBwd = False
 quantStoch = False
 quantCalibrate = False
 quantTrack = False
+quantSQuant = False
 
 quantGradMxScale = 1.
 
 scale_library = {'a': {}, 'w': {}, 'g': {}}
+
 
 
 def place_track(m, layer_list, c_path, lin_w, lin_b):
@@ -497,23 +501,23 @@ class GradStochasticClippingQ(Function):
       out = []
       for i in range(repeatBwd):
 
-        if quantCalibrate:
-          if calibrate_phase:
-            mx = torch.max(grad_output.abs()) * quantGradMxScale
-            if ctx.uname not in scale_library['g']:
-              scale_library['g'][ctx.uname] = mx
-            else:
-              scale_library['g'][ctx.uname] = .9 * \
-                  scale_library['g'][ctx.uname] + .1 * mx
-            return grad_output, None, None, None, None
-          else:
-            mx = scale_library['g'][ctx.uname]
-            grad_output = torch.clamp(grad_output, max=mx, min=-1*mx)
-        else:
-          mx = torch.max(grad_output.abs())
+        # if quantCalibrate:
+        #   if calibrate_phase:
+        #     mx = torch.max(grad_output.abs()) * quantGradMxScale
+        #     if ctx.uname not in scale_library['g']:
+        #       scale_library['g'][ctx.uname] = mx
+        #     else:
+        #       scale_library['g'][ctx.uname] = .9 * \
+        #           scale_library['g'][ctx.uname] + .1 * mx
+        #     return grad_output, None, None, None, None
+        #   else:
+        #     mx = scale_library['g'][ctx.uname]
+        #     grad_output = torch.clamp(grad_output, max=mx, min=-1*mx)
+        # else:
+        mx = torch.max(grad_output.abs())
 
-        bits = 4
-        alpha = mx / 2**(2**bits - 1)
+        bits = 3 # effectively 4
+        alpha = mx / 2**(2**bits - 2) # was 1 before, need to be 2 centered around 0
 
         if quantStoch:
           alphaEps = alpha * \
@@ -536,19 +540,112 @@ class GradStochasticClippingQ(Function):
                    ) * grad_inputQ.new(grad_inputQ.shape).uniform_(-0.5, 0.5)
         else:
           noise = torch.zeros_like(grad_inputQ)
+
         grad_inputQ = 2 ** torch.floor(torch.log2(
             ((grad_inputQ.abs() / alpha) + noise) * 4 / 3)) * alpha
 
-        grad_inputQ = torch.sign(grad_input) * torch.where(grad_inputQ < (
-            alpha * (2 ** torch.floor(torch.log2(
-                ((grad_input.abs() / alpha)))))), alpha * (2 ** torch.floor(
-                    torch.log2(((grad_input.abs() / alpha))))), grad_inputQ)
+        grad_inputQ = torch.sign(grad_input) * torch.where(grad_inputQ < (alpha * (2 ** torch.floor(torch.log2(((grad_input.abs() / alpha)))))), 
+            alpha * (2 ** torch.floor(torch.log2(((grad_input.abs() / alpha))))), grad_inputQ)
         grad_inputQ = torch.where(grad_input == 0, torch.tensor(
             [0], dtype=torch.float, device=grad_output.device), grad_inputQ)
 
         out.append(grad_inputQ)
       grad_input = sum(out) / repeatBwd
 
+      # import pdb; pdb.set_trace()
+
+      # if quantSQuant:
+      #   # grad_input.abs().unique()/mx*(2**(2**3))
+
+      #   rounding_number = grad_input
+      #   x = grad_output
+
+      #   rounding_error  = rounding_number - x
+      #   up_number = rounding_number.clone()
+      #   up_error  = rounding_error.clone()
+      #   # up_error[x >= t_max]  = 0.0 # TODO we do max always, make sure we do some clipping at some point
+      #   up_error[up_error > 0]  = 0.0
+      #   up_priority = up_error.clone().abs()
+
+      #   import pdb; pdb.set_trace()
+      #   up_error[up_error != 0]  += 1
+      #   up_number[up_error != 0] += 1
+
+      #   down_number = rounding_number.clone()
+      #   down_error  = rounding_error.clone()
+      #   # down_error[x <= t_min]  = 0.0 # TODO we do max always, make sure we do some clipping at some point
+      #   down_error[down_error < 0]  = 0.0
+      #   down_priority = down_error.clone().abs()
+
+      #   down_error[down_error != 0]  -= 1
+      #   down_number[down_error != 0] -= 1
+
+      #   flip_number = torch.tensor([0.0], device=x.device)
+      #   flip_up_number = torch.tensor([0.0], device=x.device)
+      #   flip_down_number = torch.tensor([0.0], device=x.device)
+
+      #   conver_shape = x.view(x.shape[0], x.shape[1], -1).shape
+      #   if conver_shape[2] == 1:
+      #     squant_k = False
+      #   else:
+      #     squant_k = True
+
+      #   squant_c = True
+
+      #   if squant_k:
+      #     rounding_error_sum = rounding_error.view(conver_shape).sum(-1)
+      #     _, up_order = torch.sort(up_priority.view(conver_shape), descending=True)
+      #     _, down_order = torch.sort(down_priority.view(conver_shape), descending=True)
+      #     up_priority *= 0.0
+      #     down_priority *= 0.0
+
+      #     SQuant_func(
+      #         flip_number,
+      #         flip_up_number,
+      #         flip_down_number,
+              
+      #         rounding_error_sum,
+      #         rounding_number.view(conver_shape), 
+      #         rounding_error.view(conver_shape), 
+
+      #         up_number.view(conver_shape), 
+      #         up_error.view(conver_shape), 
+      #         up_priority.view(conver_shape), 
+      #         up_order, 
+
+      #         down_number.view(conver_shape), 
+      #         down_error.view(conver_shape), 
+      #         down_priority.view(conver_shape),
+      #         down_order,
+      #     )
+        
+      #   if squant_c:
+      #     conver_shape = (1, x.shape[0], -1)
+      #     rounding_error_sum = rounding_error.view(conver_shape).sum(-1)
+      #     _, up_order = torch.sort(up_priority.view(conver_shape), descending=True)
+      #     _, down_order = torch.sort(down_priority.view(conver_shape), descending=True)
+
+      #     SQuant_func(
+      #         flip_number,
+      #         flip_up_number,
+      #         flip_down_number,
+              
+      #         rounding_error_sum,
+      #         rounding_number.view(conver_shape), 
+      #         rounding_error.view(conver_shape), 
+
+      #         up_number.view(conver_shape), 
+      #         up_error.view(conver_shape), 
+      #         up_priority.view(conver_shape), 
+      #         up_order, 
+
+      #         down_number.view(conver_shape), 
+      #         down_error.view(conver_shape), 
+      #         down_priority.view(conver_shape),
+      #         down_order
+      #     )
+
+      #   grad_input = rounding_number
     else:
       grad_input = grad_output
 

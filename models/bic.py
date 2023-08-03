@@ -4,6 +4,7 @@ import torch
 from torch import nn
 from torch import optim
 import copy
+from tqdm import tqdm
 from torch.nn import functional as F
 from torch.utils.data import DataLoader
 from models.base import BaseLearner
@@ -118,120 +119,50 @@ class BiC(BaseLearner):
                     np.save('track_stats/' + self.date_str + '_' + self.args['dataset'] + '_' + self.args['model_name'] + '_' + str(self._cur_task) + lname + '_'+stat_name+'.npy', torch.hstack(quant.track_stats['grad_stats'][lname][stat_name]).numpy())
 
   def _run(self, train_loader, test_loader, optimizer, scheduler, stage):
-    for epoch in range(1, epochs + 1):
+    prog_bar = tqdm(range(epochs))
+    for _, epoch in enumerate(prog_bar): # range(1, epochs + 1):
       self._network.train()
       losses = 0.0
       for i, (_, inputs, targets) in enumerate(train_loader):
         inputs, targets = inputs.to(self._device), targets.to(self._device)
 
+        logits = self._network(inputs)["logits"]
 
-        if self._cur_task == 0:
-          # quant.calibrate_phase = True
-          # logits = self._network(inputs)["logits"]
-          # if stage == "training":
-          #   clf_loss = F.cross_entropy(logits, targets)
-          #   if self._old_network is not None:
-          #     old_logits = self._old_network(inputs)["logits"].detach()
-          #     hat_pai_k = F.softmax(old_logits / T, dim=1)
-          #     log_pai_k = F.log_softmax(
-          #         logits[:, : self._known_classes] / T, dim=1
-          #     )
-          #     distill_loss = -torch.mean(
-          #         torch.sum(hat_pai_k * log_pai_k, dim=1)
-          #     )
-          #     loss = distill_loss * self.lamda + clf_loss * (1 - self.lamda)
-          #   else:
-          #     loss = clf_loss
-          # elif stage == "bias_correction":
-          #   loss = F.cross_entropy(torch.softmax(logits, dim=1), targets)
-          # else:
-          #   raise NotImplementedError()
-
-          # optimizer.zero_grad()
-          # loss.backward()
-
-          # # save all gradients
-          # unquantized_grad = {}
-          # for k, param in self._network.named_parameters():
-          #   if 'weight' in k:
-          #     if param.grad is not None:
-          #       unquantized_grad[k] = copy.deepcopy(param.grad)
-
-          # optimizer.step()
-
-
-
-
-          # quant.calibrate_phase = False
-          logits = self._network(inputs)["logits"]
-          if stage == "training":
-            clf_loss = F.cross_entropy(logits, targets)
-            if self._old_network is not None:
-              old_logits = self._old_network(inputs)["logits"].detach()
-              hat_pai_k = F.softmax(old_logits / T, dim=1)
-              log_pai_k = F.log_softmax(
-                  logits[:, : self._known_classes] / T, dim=1
-              )
-              distill_loss = -torch.mean(
-                  torch.sum(hat_pai_k * log_pai_k, dim=1)
-              )
-              loss = distill_loss * self.lamda + clf_loss * (1 - self.lamda)
-            else:
-              loss = clf_loss
-          elif stage == "bias_correction":
-            loss = F.cross_entropy(torch.softmax(logits, dim=1), targets)
+        if stage == "training":
+          clf_loss = F.cross_entropy(logits, targets)
+          if self._old_network is not None:
+            old_logits = self._old_network(inputs)["logits"].detach()
+            hat_pai_k = F.softmax(old_logits / T, dim=1)
+            log_pai_k = F.log_softmax(
+                logits[:, : self._known_classes] / T, dim=1
+            )
+            distill_loss = -torch.mean(
+                torch.sum(hat_pai_k * log_pai_k, dim=1)
+            )
+            loss = distill_loss * self.lamda + clf_loss * (1 - self.lamda)
           else:
-            raise NotImplementedError()
-
-          optimizer.zero_grad()
-          loss.backward()
-
-
-          # for k, param in self._network.named_parameters():
-          #   if 'weight' in k:
-          #     if param.grad is not None:
-          #       if k in grad_quant_bias:
-          #         grad_quant_bias[k] = .9 * grad_quant_bias[k] +  .1 * torch.mean(param.grad - unquantized_grad[k])
-          #       else:
-          #         grad_quant_bias[k] = torch.mean(unquantized_grad[k] - param.grad)
-
+            loss = clf_loss
+        elif stage == "bias_correction":
+          loss = F.cross_entropy(torch.softmax(logits, dim=1), targets)
         else:
+          raise NotImplementedError()
 
-          logits = self._network(inputs)["logits"]
-
-          if stage == "training":
-            clf_loss = F.cross_entropy(logits, targets)
-            if self._old_network is not None:
-              old_logits = self._old_network(inputs)["logits"].detach()
-              hat_pai_k = F.softmax(old_logits / T, dim=1)
-              log_pai_k = F.log_softmax(
-                  logits[:, : self._known_classes] / T, dim=1
-              )
-              distill_loss = -torch.mean(
-                  torch.sum(hat_pai_k * log_pai_k, dim=1)
-              )
-              loss = distill_loss * self.lamda + clf_loss * (1 - self.lamda)
-            else:
-              loss = clf_loss
-          elif stage == "bias_correction":
-            loss = F.cross_entropy(torch.softmax(logits, dim=1), targets)
-          else:
-            raise NotImplementedError()
-
-          optimizer.zero_grad()
-          loss.backward()
-          optimizer.step()
-
+        optimizer.zero_grad()
+        loss.backward()
+        optimizer.step()
 
         losses += loss.item()
+
+      if epoch % 5 == 0:
         train_acc = self._compute_accuracy(self._network, train_loader)
         test_acc = self._compute_accuracy(self._network, test_loader)
         self._network.train()
 
-        quant.track_stats["train_acc"].append(train_acc)
-        quant.track_stats["test_acc"].append(test_acc)
-        quant.track_stats["loss"].append(float(loss))
-      info = "{} => Task {}, Epoch {}/{} => Loss {:.3f}, Train_accy {:.3f}, Test_accy {:.3f}".format(
+        if quant.quantTrack:
+          quant.track_stats["train_acc"].append(train_acc)
+          quant.track_stats["test_acc"].append(test_acc)
+          quant.track_stats["loss"].append(float(loss))
+        info = "{} => Task {}, Epoch {}/{} => Loss {:.3f}, Train_accy {:.3f}, Test_accy {:.3f}".format(
           stage,
           self._cur_task,
           epoch,
@@ -239,10 +170,19 @@ class BiC(BaseLearner):
           losses / len(train_loader),
           train_acc,
           test_acc,
-      )
+        )
+      else:
+        info = "{} => Task {}, Epoch {}/{} => Loss {:.3f}".format(
+          stage,
+          self._cur_task,
+          epoch,
+          epochs,
+          losses / len(train_loader),
+        )
 
       scheduler.step()
-      logging.info(info)
+      prog_bar.set_description(info)
+    logging.info(info)
 
   def _stage1_training(self, train_loader, test_loader):
     """

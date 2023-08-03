@@ -43,6 +43,7 @@ def setup_parser():
   parser.add_argument('--quantStoch', action="store_true")
   parser.add_argument('--quantCalibrate', action="store_true")
   parser.add_argument('--quantizeTrack', action="store_true")
+  parser.add_argument('--quantSQuant', action="store_true")
 
   return parser
 

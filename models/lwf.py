@@ -177,38 +177,40 @@ class LwF(BaseLearner):
         #         grad_quant_bias[k] = torch.mean(unquantized_grad[k] - param.grad)
 
         _, preds = torch.max(logits, dim=1)
-        correct += preds.eq(targets.expand_as(preds)).cpu().sum()
+        local_correct = preds.eq(targets.expand_as(preds)).cpu().sum()
+        correct += local_correct
         total += len(targets)
 
+        local_train_acc = np.around(tensor2numpy(local_correct) * 100 / len(targets), decimals=2)
+        
+      train_acc = np.around(tensor2numpy(correct) * 100 / total, decimals=2)
       
-        train_acc = np.around(tensor2numpy(correct) * 100 / total, decimals=2)
-
-        # if epoch % 5 == 0:
-        #   info = "Task {}, Epoch {}/{} => Loss {:.3f}, Train_accy {:.2f}".format(
-        #       self._cur_task,
-        #       epoch + 1,
-        #       init_epoch,
-        #       losses / len(train_loader),
-        #       train_acc,
-        #   )
-        # else:
+      if epoch % 5 == 0:
         test_acc = self._compute_accuracy(self._network, test_loader)
         self._network.train()
 
-        quant.track_stats['train_acc'].append(train_acc)
-        quant.track_stats['test_acc'].append(test_acc)
-        quant.track_stats['loss'].append(float(loss))
-      info = "Task {}, Epoch {}/{} => Loss {:.3f}, Train_accy {:.2f}, Test_accy {:.2f}".format(
+        if quant.quantTrack:
+          quant.track_stats['train_acc'].append(local_train_acc)
+          quant.track_stats['test_acc'].append(test_acc)
+          quant.track_stats['loss'].append(float(loss))
+        info = "Task {}, Epoch {}/{} => Loss {:.3f}, Train_accy {:.2f}, Test_accy {:.2f}".format(
           self._cur_task,
           epoch + 1,
-          init_epoch,
+          epochs,
           losses / len(train_loader),
           train_acc,
           test_acc,
-      )
+        )
+      else:
+        info = "Task {}, Epoch {}/{} => Loss {:.3f}, Train_accy {:.2f}".format(
+          self._cur_task,
+          epoch + 1,
+          epochs,
+          losses / len(train_loader),
+          train_acc,
+        )
       scheduler.step()
       prog_bar.set_description(info)
-
     logging.info(info)
 
   def _update_representation(self, train_loader, test_loader, optimizer, scheduler):
@@ -245,39 +247,40 @@ class LwF(BaseLearner):
         optimizer.step()
         losses += loss.item()
 
-        with torch.no_grad():
-          _, preds = torch.max(logits, dim=1)
-          local_correct = preds.eq(targets.expand_as(preds)).cpu().sum()
-          correct += local_correct
-          total += len(targets)
+        _, preds = torch.max(logits, dim=1)
+        local_correct = preds.eq(targets.expand_as(preds)).cpu().sum()
+        correct += local_correct
+        total += len(targets)
 
-      
-        train_acc = np.around(tensor2numpy(correct) * 100 / total, decimals=2)
         local_train_acc = np.around(tensor2numpy(local_correct) * 100 / len(targets), decimals=2)
 
-        # if epoch % 5 == 0:
+      train_acc = np.around(tensor2numpy(correct) * 100 / total, decimals=2)
+      
+
+      if epoch % 5 == 0:
         test_acc = self._compute_accuracy(self._network, test_loader)
         self._network.train()
 
-        quant.track_stats['train_acc'].append(local_train_acc)
-        quant.track_stats['test_acc'].append(test_acc)
-        quant.track_stats['loss'].append(float(loss))
-      info = "Task {}, Epoch {}/{} => Loss {:.3f}, Train_accy {:.2f}, Test_accy {:.2f}".format(
+        if quant.quantTrack:
+          quant.track_stats['train_acc'].append(local_train_acc)
+          quant.track_stats['test_acc'].append(test_acc)
+          quant.track_stats['loss'].append(float(loss))
+        info = "Task {}, Epoch {}/{} => Loss {:.3f}, Train_accy {:.2f}, Test_accy {:.2f}".format(
           self._cur_task,
           epoch + 1,
           epochs,
           losses / len(train_loader),
           train_acc,
           test_acc,
-      )
-      # else:
-      #   info = "Task {}, Epoch {}/{} => Loss {:.3f}, Train_accy {:.2f}".format(
-      #       self._cur_task,
-      #       epoch + 1,
-      #       epochs,
-      #       losses / len(train_loader),
-      #       train_acc,
-      #   )
+        )
+      else:
+        info = "Task {}, Epoch {}/{} => Loss {:.3f}, Train_accy {:.2f}".format(
+          self._cur_task,
+          epoch + 1,
+          epochs,
+          losses / len(train_loader),
+          train_acc,
+        )
       scheduler.step()
       prog_bar.set_description(info)
     logging.info(info)
