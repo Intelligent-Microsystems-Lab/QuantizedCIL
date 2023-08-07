@@ -82,7 +82,7 @@ def setup_parser():
                       required=False, choices=['max'])
   parser.add_argument('--quantizeTrack', action="store_true")
   parser.add_argument('--quantMethod', '-qmethod', type=str,
-                      default=None, required=False, choices=['LUQ', "IBM",
+                      default=None, required=False, choices=['luq', "ibm",
                                                              'ours'])
 
   return parser
