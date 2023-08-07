@@ -32,7 +32,7 @@ def _train(args):
   exp_name = "{}_{}_{}_{}_B{}_Inc{}".format(
       args["time_str"],
       args["dataset"],
-      args["convnet_type"],
+      args["model_type"],
       args["seed"],
       init_cls,
       args["increment"],
@@ -59,7 +59,7 @@ def _train(args):
   csv_name = "{}_{}_{}_B{}_Inc{}".format(
       args["dataset"],
       args["seed"],
-      args["convnet_type"],
+      args["model_type"],
       init_cls,
       args["increment"],
   )
