@@ -40,7 +40,7 @@ from backbones.memo_resnet import get_resnet34_imagenet as memo_resnet34_imagene
 from backbones.memo_resnet import get_resnet50_imagenet as memo_resnet50_imagenet
 
 
-def get_backbone(backbone_type, pretrained=False, args):
+def get_backbone(backbone_type, pretrained=False, args=None):
   name = backbone_type.lower()
   if name == "resnet32":
     return resnet32()
@@ -119,7 +119,7 @@ def get_backbone(backbone_type, pretrained=False, args):
     g_blcoks, s_blocks = memo_resnet50_imagenet()
     return g_blcoks, s_blocks
   
-  elif name == 'fcnet':
+  elif name == 'fcnet' and args is not None:
     return FCNet(args.in_dim, args.hid_dim, args.out_dim, args.nr_hid_layers,
                  args.act_fun)
 
