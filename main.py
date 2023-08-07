@@ -25,33 +25,33 @@ def update_message(method, argname, value):
 
 def eval_args(args):
   # prevent arguments conflict
-  if args["quant_method"]=="LUQ":
-    if not args["quantizeFwd"]:
+  if args.quantMethod=="LUQ":
+    if not args.quantizeFwd:
       update_message("LUQ", "quantizeFwd", True)
-      args["quantizeFwd"] = True
-    if not args["quantizeBwd"]:
+      args.quantizeFwd = True
+    if not args.quantizeBwd:
       update_message("LUQ", "quantizeBwd", True)
-      args["quantizeBwd"] = True
-    if args["quantGradRound"] != "stoch":
+      args.quantizeBwd = True
+    if args.quantGradRound != "stoch":
       update_message("LUQ", "quantGradRound", "stoch")
-      args["quantGradRound"] = "stoch" 
-    if args["quantCalibrate"]:
+      args.quantGradRound = "stoch" 
+    if args.quantCalibrate:
       update_message("LUQ", "quantCalibrate", "max")
-      args["quantCalibrate"] = "max"
-    if args["quantizeTrack"]:
+      args.quantCalibrate = "max"
+    if args.quantizeTrack:
       update_message("LUQ", "quantizeTrack", False)
-      args["quantizeTrack"] = False
-  elif args["quant_method"]=="ours":
+      args.quantizeTrack = False
+  elif args.quant_method=="ours":
     # TODO: add our quantization method
     pass
-  if args["quantizeTrack"]:
+  if args.quantizeTrack:
     # switching both off removes all quantization
-    if args["quantizeFwd"]:
+    if args.quantizeFwd:
       update_message("quantizeTrack", "quantizeFwd", False)
-      args["quantizeFwd"] = False
-    if args["quantizeBwd"]:
+      args.quantizeFwd = False
+    if args.quantizeBwd:
       update_message("quantizeTrack", "quantizeBwd", False)
-      args["quantizeBwd"] = False
+      args.quantizeBwd = False
   return args
 
 def setup_parser():
@@ -81,7 +81,7 @@ def setup_parser():
   parser.add_argument('--quantCalibrate', type=str, default="max",
                       required=False, choices=['max'])
   parser.add_argument('--quantizeTrack', action="store_true")
-  parser.add_argument('--quant_method', '-qmethod', type=str,
+  parser.add_argument('--quantMethod', '-qmethod', type=str,
                       default=None, required=False, choices=['LUQ', "IBM",
                                                              'ours'])
 
