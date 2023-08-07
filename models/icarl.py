@@ -12,7 +12,7 @@ from utils.inc_net import IncrementalNet
 from utils.inc_net import CosineIncrementalNet
 from utils.toolkit import target2onehot, tensor2numpy
 
-from convs.linears import SimpleLinear
+from backbones.linears import SimpleLinear
 
 from datetime import datetime
 import quant
