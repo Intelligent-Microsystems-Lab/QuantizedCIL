@@ -41,7 +41,7 @@ def eval_args(args):
     if args.quantizeTrack:
       update_message("LUQ", "quantizeTrack", False)
       args.quantizeTrack = False
-  elif args.quant_method=="ours":
+  elif args.quantMethod=="ours":
     # TODO: add our quantization method
     pass
   if args.quantizeTrack:

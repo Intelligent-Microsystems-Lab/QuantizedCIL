@@ -11,7 +11,7 @@ from torch.nn.parameter import Parameter
 from torch.autograd.function import Function
 from torch.autograd.function import InplaceFunction
 
-from convs.linears import SimpleLinear
+from backbones.linears import SimpleLinear
 
 from squant_function import SQuant_func
 
@@ -501,22 +501,9 @@ class GradStochasticClippingQ(Function):
       out = []
       for i in range(repeatBwd):
 
-        # if quantCalibrate:
-        #   if calibrate_phase:
-        #     mx = torch.max(grad_output.abs()) * quantGradMxScale
-        #     if ctx.uname not in scale_library['g']:
-        #       scale_library['g'][ctx.uname] = mx
-        #     else:
-        #       scale_library['g'][ctx.uname] = .9 * \
-        #           scale_library['g'][ctx.uname] + .1 * mx
-        #     return grad_output, None, None, None, None
-        #   else:
-        #     mx = scale_library['g'][ctx.uname]
-        #     grad_output = torch.clamp(grad_output, max=mx, min=-1*mx)
-        # else:
         mx = torch.max(grad_output.abs())
 
-        bits = quantBits - 1 # for sign bit
+        bits = quantBits - 1
         alpha = mx / 2**(2**bits - 2) # was 1 before, need to be 2 centered around 0
 
         if quantGradRound == "stochastic":
@@ -550,106 +537,11 @@ class GradStochasticClippingQ(Function):
             [0], dtype=torch.float, device=grad_output.device), grad_inputQ)
 
         out.append(grad_inputQ)
+        # assert grad_inputQ.unique().shape[0] <= 2**quantBits
       grad_input = sum(out) / repeatBwd
 
-      # import pdb; pdb.set_trace()
-
-      # if quantSQuant:
-      #   # grad_input.abs().unique()/mx*(2**(2**3))
-
-      #   rounding_number = grad_input
-      #   x = grad_output
-
-      #   rounding_error  = rounding_number - x
-      #   up_number = rounding_number.clone()
-      #   up_error  = rounding_error.clone()
-      #   # up_error[x >= t_max]  = 0.0 # TODO we do max always, make sure we do some clipping at some point
-      #   up_error[up_error > 0]  = 0.0
-      #   up_priority = up_error.clone().abs()
-
-      #   import pdb; pdb.set_trace()
-      #   up_error[up_error != 0]  += 1
-      #   up_number[up_error != 0] += 1
-
-      #   down_number = rounding_number.clone()
-      #   down_error  = rounding_error.clone()
-      #   # down_error[x <= t_min]  = 0.0 # TODO we do max always, make sure we do some clipping at some point
-      #   down_error[down_error < 0]  = 0.0
-      #   down_priority = down_error.clone().abs()
-
-      #   down_error[down_error != 0]  -= 1
-      #   down_number[down_error != 0] -= 1
-
-      #   flip_number = torch.tensor([0.0], device=x.device)
-      #   flip_up_number = torch.tensor([0.0], device=x.device)
-      #   flip_down_number = torch.tensor([0.0], device=x.device)
-
-      #   conver_shape = x.view(x.shape[0], x.shape[1], -1).shape
-      #   if conver_shape[2] == 1:
-      #     squant_k = False
-      #   else:
-      #     squant_k = True
-
-      #   squant_c = True
-
-      #   if squant_k:
-      #     rounding_error_sum = rounding_error.view(conver_shape).sum(-1)
-      #     _, up_order = torch.sort(up_priority.view(conver_shape), descending=True)
-      #     _, down_order = torch.sort(down_priority.view(conver_shape), descending=True)
-      #     up_priority *= 0.0
-      #     down_priority *= 0.0
-
-      #     SQuant_func(
-      #         flip_number,
-      #         flip_up_number,
-      #         flip_down_number,
-              
-      #         rounding_error_sum,
-      #         rounding_number.view(conver_shape), 
-      #         rounding_error.view(conver_shape), 
-
-      #         up_number.view(conver_shape), 
-      #         up_error.view(conver_shape), 
-      #         up_priority.view(conver_shape), 
-      #         up_order, 
-
-      #         down_number.view(conver_shape), 
-      #         down_error.view(conver_shape), 
-      #         down_priority.view(conver_shape),
-      #         down_order,
-      #     )
-        
-      #   if squant_c:
-      #     conver_shape = (1, x.shape[0], -1)
-      #     rounding_error_sum = rounding_error.view(conver_shape).sum(-1)
-      #     _, up_order = torch.sort(up_priority.view(conver_shape), descending=True)
-      #     _, down_order = torch.sort(down_priority.view(conver_shape), descending=True)
-
-      #     SQuant_func(
-      #         flip_number,
-      #         flip_up_number,
-      #         flip_down_number,
-              
-      #         rounding_error_sum,
-      #         rounding_number.view(conver_shape), 
-      #         rounding_error.view(conver_shape), 
-
-      #         up_number.view(conver_shape), 
-      #         up_error.view(conver_shape), 
-      #         up_priority.view(conver_shape), 
-      #         up_order, 
-
-      #         down_number.view(conver_shape), 
-      #         down_error.view(conver_shape), 
-      #         down_priority.view(conver_shape),
-      #         down_order
-      #     )
-
-      #   grad_input = rounding_number
     else:
       grad_input = grad_output
 
-    # if torch.isnan(grad_input).any():
-    #   import pdb; pdb.set_trace()
 
     return grad_input, None, None, None, None

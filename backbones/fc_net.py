@@ -1,7 +1,7 @@
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-import linears
+import backbones.linears
 
 def get_activation(act_fun):
     if act_fun == "relu":
