@@ -25,25 +25,39 @@ def update_message(method, argname, value):
 
 def eval_args(args):
   # prevent arguments conflict
-  if args.quantMethod=="LUQ":
+  if args.quantMethod=="luq":
     if not args.quantizeFwd:
-      update_message("LUQ", "quantizeFwd", True)
+      update_message("luq", "quantizeFwd", True)
       args.quantizeFwd = True
     if not args.quantizeBwd:
-      update_message("LUQ", "quantizeBwd", True)
+      update_message("luq", "quantizeBwd", True)
       args.quantizeBwd = True
     if args.quantGradRound != "stoch":
-      update_message("LUQ", "quantGradRound", "stoch")
+      update_message("luq", "quantGradRound", "stoch")
       args.quantGradRound = "stoch" 
     if args.quantCalibrate:
-      update_message("LUQ", "quantCalibrate", "max")
+      update_message("luq", "quantCalibrate", "max")
       args.quantCalibrate = "max"
     if args.quantizeTrack:
-      update_message("LUQ", "quantizeTrack", False)
+      update_message("luq", "quantizeTrack", False)
       args.quantizeTrack = False
   elif args.quantMethod=="ours":
     # TODO: add our quantization method
-    pass
+    if not args.quantizeFwd:
+      update_message("ours", "quantizeFwd", True)
+      args.quantizeFwd = True
+    if not args.quantizeBwd:
+      update_message("ours", "quantizeBwd", True)
+      args.quantizeBwd = True
+    if args.quantCalibrate:
+      update_message("ours", "quantCalibrate", "max")
+      args.quantCalibrate = "max"
+    if args.quantGradRound != "standard":
+      update_message("ours", "quantGradRound", "standard")
+      args.quantGradRound = "standard" 
+    if args.quantizeTrack:
+      update_message("ours", "quantizeTrack", False)
+      args.quantizeTrack = False
   if args.quantizeTrack:
     # switching both off removes all quantization
     if args.quantizeFwd:
@@ -77,7 +91,7 @@ def setup_parser():
   parser.add_argument('--quantizeFwd', action="store_true")
   parser.add_argument('--quantizeBwd', action="store_true")
   parser.add_argument('--quantGradRound', type=str, default="standard",
-                      required=False, choices=['stoch', 'SQ', 'standard'])
+                      required=False, choices=['stoch', 'sq', 'standard'])
   parser.add_argument('--quantCalibrate', type=str, default="max",
                       required=False, choices=['max'])
   parser.add_argument('--quantizeTrack', action="store_true")
