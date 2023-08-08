@@ -67,12 +67,12 @@ class BiC(BaseLearner):
           mode="train",
           appendent=self._get_memory(),
           val_samples_per_class=int(
-              self.args.split_ratio * self._memory_size / self._known_classes
+              self.args['split_ratio'] * self._memory_size / self._known_classes
           ),
       )
       self.val_loader = DataLoader(
-          val_dset, batch_size=self.args.batch_size, shuffle=True,
-          num_workers=self.args.num_workers
+          val_dset, batch_size=self.args['batch_size'], shuffle=True,
+          num_workers=self.args['num_workers']
       )
       logging.info(
           "Stage1 dset: {}, Stage2 dset: {}".format(
@@ -93,12 +93,12 @@ class BiC(BaseLearner):
     )
 
     self.train_loader = DataLoader(
-        train_dset, batch_size=self.args.batch_size, shuffle=True,
-        num_workers=self.args.num_workers
+        train_dset, batch_size=self.args['batch_size'], shuffle=True,
+        num_workers=self.args['num_workers']
     )
     self.test_loader = DataLoader(
-        test_dset, batch_size=self.args.batch_size, shuffle=False,
-        num_workers=self.args.num_workers
+        test_dset, batch_size=self.args['batch_size'], shuffle=False,
+        num_workers=self.args['num_workers']
     )
 
     self._log_bias_params()
@@ -124,7 +124,7 @@ class BiC(BaseLearner):
                     np.save('track_stats/' + self.date_str + '_' + self.args['dataset'] + '_' + self.args['model_name'] + '_' + str(self._cur_task) + lname + '_'+stat_name+'.npy', torch.hstack(quant.track_stats['grad_stats'][lname][stat_name]).numpy())
 
   def _run(self, train_loader, test_loader, optimizer, scheduler, stage):
-    prog_bar = tqdm(range(self.args.epochs))
+    prog_bar = tqdm(range(self.args['epochs']))
     for _, epoch in enumerate(prog_bar): # range(1, epochs + 1):
       self._network.train()
       losses = 0.0
@@ -137,9 +137,9 @@ class BiC(BaseLearner):
           clf_loss = F.cross_entropy(logits, targets)
           if self._old_network is not None:
             old_logits = self._old_network(inputs)["logits"].detach()
-            hat_pai_k = F.softmax(old_logits / self.args.T, dim=1)
+            hat_pai_k = F.softmax(old_logits / self.args['T'], dim=1)
             log_pai_k = F.log_softmax(
-                logits[:, : self._known_classes] / self.args.T, dim=1
+                logits[:, : self._known_classes] / self.args['T'], dim=1
             )
             distill_loss = -torch.mean(
                 torch.sum(hat_pai_k * log_pai_k, dim=1)
@@ -171,7 +171,7 @@ class BiC(BaseLearner):
           stage,
           self._cur_task,
           epoch,
-          self.args.epochs,
+          self.args['epochs'],
           losses / len(train_loader),
           train_acc,
           test_acc,
@@ -181,7 +181,7 @@ class BiC(BaseLearner):
           stage,
           self._cur_task,
           epoch,
-          self.args.epochs,
+          self.args['epochs'],
           losses / len(train_loader),
         )
 
@@ -203,7 +203,7 @@ class BiC(BaseLearner):
         lambda p: id(p) not in ignored_params, self._network.parameters()
     )
     network_params = [
-        {"params": base_params, "lr": self.args.lrate, "weight_decay": self.args.weight_decay},
+        {"params": base_params, "lr": self.args['lrate'], "weight_decay": self.args['weight_decay']},
         {
             "params": self._network.bias_layers.parameters(),
             "lr": 0,
@@ -211,10 +211,10 @@ class BiC(BaseLearner):
         },
     ]
     optimizer = optim.SGD(
-        network_params, lr=self.args.lrate, momentum=0.9, weight_decay=self.args.weight_decay
+        network_params, lr=self.args['lrate'], momentum=0.9, weight_decay=self.args['weight_decay']
     )
     scheduler = optim.lr_scheduler.MultiStepLR(
-        optimizer=optimizer, milestones=self.args.milestones, gamma=self.args.lrate_decay
+        optimizer=optimizer, milestones=self.args['milestones'], gamma=self.args['lrate_decay']
     )
 
     if len(self._multiple_gpus) > 1:
@@ -242,15 +242,15 @@ class BiC(BaseLearner):
     network_params = [
         {
             "params": self._network.bias_layers[-1].parameters(),
-            "lr": self.args.lrate,
-            "weight_decay": self.args.weight_decay,
+            "lr": self.args['lrate'],
+            "weight_decay": self.args['weight_decay'],
         }
     ]
     optimizer = optim.SGD(
-        network_params, lr=self.args.lrate, momentum=0.9, weight_decay=self.args.weight_decay
+        network_params, lr=self.args['lrate'], momentum=0.9, weight_decay=self.args['weight_decay']
     )
     scheduler = optim.lr_scheduler.MultiStepLR(
-        optimizer=optimizer, milestones=self.args.milestones, gamma=self.args.lrate_decay
+        optimizer=optimizer, milestones=self.args['milestones'], gamma=self.args['lrate_decay']
     )
 
     if len(self._multiple_gpus) > 1:
