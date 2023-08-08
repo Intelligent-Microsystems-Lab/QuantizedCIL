@@ -80,7 +80,7 @@ def place_track(m, layer_list, c_path, lin_w, lin_b):
     place_track(ch, layer_list, c_path + '_' + n, lin_w, lin_b)
 
 
-def place_quant(m, lin_w, lin_b, c_path='', args=None):
+def place_quant(m, lin_w, lin_b, c_path='',):
   for attr_str in dir(m):
     if attr_str[:1] != '_':
       target_attr = getattr(m, attr_str)
@@ -108,8 +108,7 @@ def place_quant(m, lin_w, lin_b, c_path='', args=None):
         setattr(m, attr_str, tmp_meth(in_features=target_attr.in_features,
                                         out_features=target_attr.out_features,
                                         bias=hasattr(target_attr, 'bias'),
-                                        uname=c_path + '_' + attr_str,
-                                        parsed_args=m.args))
+                                        uname=c_path + '_' + attr_str,))
         if lin_w is not None:
           m.fc.weight = nn.Parameter(lin_w)
         if lin_b is not None:
@@ -240,6 +239,9 @@ class UniformQuantizeSawb(InplaceFunction):
     # straight-through estimator
     grad_input = grad_output
     return grad_input, None, None, None, None
+
+
+
 
 
 class Linear_LUQ(nn.Linear):
@@ -470,14 +472,36 @@ class FLinearQ(Function):
     return grad_input, grad_w, None, None, None, None
 
 
+def grad_scale(x, scale):
+  y = x
+  y_grad = x * scale
+  return (y - y_grad).detach() + y_grad
+
+
+def round_pass(x):
+  y = x.round()
+  y_grad = x
+  return (y - y_grad).detach() + y_grad
+
+
+def lsq(x, s, Qn, Qp):
+  s_grad_scale = 1.0 / ((Qp * x.numel()) ** 0.5)
+  s_scale = grad_scale(s, s_grad_scale)
+
+  x = x / s_scale
+  x = torch.clamp(x, Qn, Qp)
+  x = round_pass(x)
+  x = x * s_scale
+
+  return x
+
 class Linear_Ours(nn.Linear):
 
   """docstring for Conv2d_BF16."""
 
-  def __init__(self, uname, parsed_args=None, *args, **kwargs,):
+  def __init__(self, uname, *args, **kwargs):
     super(Linear_Ours, self).__init__(*args, **kwargs)
     self.fullName = ''
-    self.args = parsed_args
     self.statistics = []
     self.layerIdx = 0
 
@@ -512,6 +536,9 @@ class Linear_Ours(nn.Linear):
     h = scipy.linalg.block_diag( *[hadamard(biggest_pow2)]* int(quantBatchSize/biggest_pow2) )
     self.register_buffer('hadamard_bs', torch.tensor(h, dtype = self.weight.dtype))
 
+    self.lsq_act = Parameter(torch.tensor([1.], dtype=torch.float32))
+    self.lsq_wgt = Parameter(torch.tensor([ self.weight.abs().mean() * 2 / np.sqrt(self.QpW) ], dtype=torch.float32))
+
 
   def forward(self, input):
 
@@ -519,16 +546,19 @@ class Linear_Ours(nn.Linear):
       # w_q = UniformQuantizeSawb.apply(
       #       self.weight, self.c1, self.c2, self.QpW, self.QnW)
 
-      # if torch.min(input) < 0:
-      #   self.QnA = -2 ** (self.abits - 1) + 1
-      #   self.QpA = 2 ** (self.wbits - 1) - 1
+      w_q = lsq(self.weight, self.lsq_wgt, self.QpW, self.QnW)
+
+      if torch.min(input) < 0:
+        self.QnA = -2 ** (self.abits - 1) + 1
+        self.QpA = 2 ** (self.wbits - 1) - 1
 
       
       # qinput = UniformQuantizeSawb.apply(
       #       input, self.c1, self.c2, self.QpA, self.QnA)
+      qinput = lsq(input, self.lsq_act, self.QpA, self.QnA)
 
-      w_q = self.weight
-      qinput = input
+      # w_q = self.weight
+      # qinput = input
 
       # TODO: optimize speed of hadamard creation
       if input.shape[0] != quantBatchSize:
