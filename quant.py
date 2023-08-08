@@ -80,7 +80,7 @@ def place_track(m, layer_list, c_path, lin_w, lin_b):
     place_track(ch, layer_list, c_path + '_' + n, lin_w, lin_b)
 
 
-def place_quant(m, lin_w, lin_b, c_path='',):
+def place_quant(m, lin_w, lin_b, c_path='', args=None):
   for attr_str in dir(m):
     if attr_str[:1] != '_':
       target_attr = getattr(m, attr_str)
@@ -108,7 +108,8 @@ def place_quant(m, lin_w, lin_b, c_path='',):
         setattr(m, attr_str, tmp_meth(in_features=target_attr.in_features,
                                         out_features=target_attr.out_features,
                                         bias=hasattr(target_attr, 'bias'),
-                                        uname=c_path + '_' + attr_str,))
+                                        uname=c_path + '_' + attr_str,
+                                        parsed_args=m.args))
         if lin_w is not None:
           m.fc.weight = nn.Parameter(lin_w)
         if lin_b is not None:
@@ -473,9 +474,10 @@ class Linear_Ours(nn.Linear):
 
   """docstring for Conv2d_BF16."""
 
-  def __init__(self, uname, *args, **kwargs):
+  def __init__(self, uname, parsed_args=None, *args, **kwargs,):
     super(Linear_Ours, self).__init__(*args, **kwargs)
     self.fullName = ''
+    self.args = parsed_args
     self.statistics = []
     self.layerIdx = 0
 
