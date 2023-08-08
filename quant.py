@@ -1,5 +1,5 @@
-# IMSL Lab - University of Notre Dame
-# Author: Clemens JS Schaefer and Martin Schiemer
+# IMSL Lab - University of Notre Dame | University of St Andrews
+# Author: Clemens JS Schaefer | Martin Schiemer
 # Quantized training.
 
 import scipy
