@@ -73,6 +73,7 @@ def setup_parser():
       description='Reproduce of multiple continual learning algorthms.')
 
   parser.add_argument('--dataset', type=str, default="cifar100")
+  parser.add_argument('--batch_size', type=int, default=128)
   parser.add_argument('--memory_size', '-ms', type=int, default=2000)
   parser.add_argument('--init_cls', '-init', type=int, default=10)
   parser.add_argument('--increment', '-incre', type=int, default=10)
@@ -98,6 +99,25 @@ def setup_parser():
   parser.add_argument('--quantMethod', '-qmethod', type=str,
                       default=None, required=False, choices=['luq', "ibm",
                                                              'ours'])
+  # training parameters
+  parser.add_argument('--init_epoch', type=int, default=170)
+  parser.add_argument('--init_lr', type=float, default=0.05)
+  parser.add_argument('--init_milestones', nargs='+',
+                      type=int, default=[60, 100, 140])
+  parser.add_argument('--init_lr_decay', type=float, default=0.1)
+  parser.add_argument('--init_weight_decay', type=float, default=2e-4) # 0.0005
+  parser.add_argument('--epochs', type=int, default=170)
+  parser.add_argument('--lr', type=float, default=0.05)
+  parser.add_argument('--milestones', nargs='+',
+                      type=int, default=[60, 100, 140])
+  parser.add_argument('--lr_decay', type=float, default=0.1)
+  parser.add_argument('--weight_decay', type=float, default=2e-4)
+  parser.add_argument('--num_workers', type=int, default=8)
+  parser.add_argument('--T', type=int, default=2)
+  parser.add_argument('--lamda', type=float, default=3)
+  parser.add_argument('--split_ratio', type=float, default=0.1)
+
+
 
   return parser
 
