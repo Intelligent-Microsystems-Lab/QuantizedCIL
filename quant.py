@@ -3,6 +3,7 @@
 # Quantized training.
 
 import scipy
+import numpy as np
 
 import torch
 import torch.nn as nn
@@ -431,30 +432,35 @@ class GradStochasticClippingQ(Function):
 class FLinearQ(Function):
 
   @staticmethod
-  def forward(ctx, x, w, quantizeBwd, uname, h_in, h_out):
+  def forward(ctx, x, w, quantizeBwd, uname, h_out, h_bs):
     ctx.uname = uname
-    ctx.save_for_backward(x, w, torch.tensor(quantizeBwd), h_in, h_out)
+    ctx.save_for_backward(x, w, torch.tensor(quantizeBwd), h_out, h_bs)
     output = F.linear(x, w)
     return output
 
   @staticmethod
   def backward(ctx, grad_output):
-    x, w, quant, h_in, h_out = ctx.saved_tensors
+    x, w, quant, h_out, h_bs = ctx.saved_tensors
 
     if quant:
-      import pdb; pdb.set_trace()
 
-      w = h_out @ w 
+      w_h1 = h_out @ w
       grad_output_h1 = grad_output @ h_out
 
-      grad_input = grad_output_h1 @ w
+      # quant grad_output
 
+      grad_input = (grad_output_h1 @ w_h1) * 1/prime_factors(h_out.shape[0])
 
-      x = x @ h_in
-      grad_output_h2 = h_in @ grad_output
+      x_h2 = h_bs @ x
+      grad_output_h2 = grad_output.T @ h_bs
 
-      grad_w = grad_output.T @ x
+      # quant grad_output
 
+      grad_w = (grad_output_h2 @ x_h2) * 1/prime_factors(h_bs.shape[0])
+
+      # np.testing.assert_allclose(grad_w.cpu(), (grad_output.T @ x).cpu())
+      # np.testing.assert_allclose(grad_input.cpu(), (grad_output @ w).cpu() )
+      
     else:
       grad_input = grad_output @ w
 
@@ -496,30 +502,40 @@ class Linear_Ours(nn.Linear):
     self.uname = uname
 
     
-    biggest_pow2 = prime_factors(self.in_features)
-    h = scipy.linalg.block_diag( *[hadamard(biggest_pow2)]* int(self.in_features/biggest_pow2) )
-    self.register_buffer('hadamard_in', torch.tensor(h, dtype = self.weight.dtype))
-
     biggest_pow2 = prime_factors(self.out_features)
     h = scipy.linalg.block_diag( *[hadamard(biggest_pow2)]* int(self.out_features/biggest_pow2) )
     self.register_buffer('hadamard_out', torch.tensor(h, dtype = self.weight.dtype))
+
+    biggest_pow2 = prime_factors(quantBatchSize)
+    h = scipy.linalg.block_diag( *[hadamard(biggest_pow2)]* int(quantBatchSize/biggest_pow2) )
+    self.register_buffer('hadamard_bs', torch.tensor(h, dtype = self.weight.dtype))
 
 
   def forward(self, input):
 
     if self.quantizeFwd:
-      w_q = UniformQuantizeSawb.apply(
-            self.weight, self.c1, self.c2, self.QpW, self.QnW)
+      # w_q = UniformQuantizeSawb.apply(
+      #       self.weight, self.c1, self.c2, self.QpW, self.QnW)
 
-      if torch.min(input) < 0:
-        self.QnA = -2 ** (self.abits - 1) + 1
-        self.QpA = 2 ** (self.wbits - 1) - 1
+      # if torch.min(input) < 0:
+      #   self.QnA = -2 ** (self.abits - 1) + 1
+      #   self.QpA = 2 ** (self.wbits - 1) - 1
 
       
-      qinput = UniformQuantizeSawb.apply(
-            input, self.c1, self.c2, self.QpA, self.QnA)
+      # qinput = UniformQuantizeSawb.apply(
+      #       input, self.c1, self.c2, self.QpA, self.QnA)
 
-      output = FLinearQ.apply(qinput, w_q, self.quantizeBwd, self.uname, self.hadamard_in, self.hadamard_out,) + self.bias
+      w_q = self.weight
+      qinput = input
+
+      # TODO: optimize speed of hadamard creation
+      if input.shape[0] != quantBatchSize:
+        biggest_pow2 = prime_factors(input.shape[0])
+        h_bs = torch.tensor(scipy.linalg.block_diag( *[hadamard(biggest_pow2)]* int(input.shape[0]/biggest_pow2) ), dtype=self.weight.dtype).to(self.weight.device)
+      else:
+        h_bs = self.hadamard_bs
+
+      output = FLinearQ.apply(qinput, w_q, self.quantizeBwd, self.uname, self.hadamard_out, h_bs,) + self.bias
 
     else:
       output = F.linear(input, self.weight, self.bias)
