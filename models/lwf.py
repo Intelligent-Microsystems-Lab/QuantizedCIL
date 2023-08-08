@@ -118,13 +118,13 @@ class LwF(BaseLearner):
     else:
       optimizer = optim.SGD(
           self._network.parameters(),
-          lr=self.args['lrate'],
+          lr=self.args['lr'],
           momentum=0.9,
           weight_decay=self.args['weight_decay'],
       )
       scheduler = optim.lr_scheduler.MultiStepLR(
           optimizer=optimizer, milestones=self.args['milestones'],
-          gamma=self.args['lrate_decay']
+          gamma=self.args['lr_decay']
       )
       self._update_representation(
           train_loader, test_loader, optimizer, scheduler)

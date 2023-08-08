@@ -203,7 +203,7 @@ class BiC(BaseLearner):
         lambda p: id(p) not in ignored_params, self._network.parameters()
     )
     network_params = [
-        {"params": base_params, "lr": self.args['lrate'], "weight_decay": self.args['weight_decay']},
+        {"params": base_params, "lr": self.args['lr'], "weight_decay": self.args['weight_decay']},
         {
             "params": self._network.bias_layers.parameters(),
             "lr": 0,
@@ -211,10 +211,10 @@ class BiC(BaseLearner):
         },
     ]
     optimizer = optim.SGD(
-        network_params, lr=self.args['lrate'], momentum=0.9, weight_decay=self.args['weight_decay']
+        network_params, lr=self.args['lr'], momentum=0.9, weight_decay=self.args['weight_decay']
     )
     scheduler = optim.lr_scheduler.MultiStepLR(
-        optimizer=optimizer, milestones=self.args['milestones'], gamma=self.args['lrate_decay']
+        optimizer=optimizer, milestones=self.args['milestones'], gamma=self.args['lr_decay']
     )
 
     if len(self._multiple_gpus) > 1:
@@ -242,15 +242,15 @@ class BiC(BaseLearner):
     network_params = [
         {
             "params": self._network.bias_layers[-1].parameters(),
-            "lr": self.args['lrate'],
+            "lr": self.args['lr'],
             "weight_decay": self.args['weight_decay'],
         }
     ]
     optimizer = optim.SGD(
-        network_params, lr=self.args['lrate'], momentum=0.9, weight_decay=self.args['weight_decay']
+        network_params, lr=self.args['lr'], momentum=0.9, weight_decay=self.args['weight_decay']
     )
     scheduler = optim.lr_scheduler.MultiStepLR(
-        optimizer=optimizer, milestones=self.args['milestones'], gamma=self.args['lrate_decay']
+        optimizer=optimizer, milestones=self.args['milestones'], gamma=self.args['lr_decay']
     )
 
     if len(self._multiple_gpus) > 1:

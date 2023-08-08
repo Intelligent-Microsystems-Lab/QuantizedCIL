@@ -120,7 +120,7 @@ class iCaRL(BaseLearner):
       optimizer = optim.SGD(
           self._network.parameters(),
           momentum=0.9,
-          lr=init_lr,
+          lr=self.args['init_lr'],
           weight_decay=self.args['init_weight_decay'],
       )
       scheduler = optim.lr_scheduler.MultiStepLR(
@@ -130,12 +130,12 @@ class iCaRL(BaseLearner):
     else:
       optimizer = optim.SGD(
           self._network.parameters(),
-          lr=self.args['lrate'],
+          lr=self.args['lr'],
           momentum=0.9,
           weight_decay=self.args['weight_decay'],
       )  # 1e-5
       scheduler = optim.lr_scheduler.MultiStepLR(
-          optimizer=optimizer, milestones=self.args['milestones'], gamma=self.args['lrate_decay']
+          optimizer=optimizer, milestones=self.args['milestones'], gamma=self.args['lr_decay']
       )
       self._update_representation(
           train_loader, test_loader, optimizer, scheduler)
