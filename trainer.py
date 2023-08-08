@@ -104,6 +104,7 @@ def _train(args):
   quant.quantCalibrate = args["quantCalibrate"]
   quant.quantTrack = args["quantizeTrack"]
   quant.quantBits = args["quantBits"]
+  quant.quantMethod = args["quantMethod"]
 
   start_time = time.time()
   logging.info(f"Start time:{start_time}")

@@ -14,7 +14,7 @@ from datetime import datetime
 import quant
 
 epochs = 170
-lrate = 0.1
+lrate = 0.05
 milestones = [60, 100, 140]
 lrate_decay = 0.1
 batch_size = 128
@@ -55,8 +55,10 @@ class BiC(BaseLearner):
     lin_w, lin_b = quant.save_lin_params(self._network)
     if quant.quantTrack:
         quant.place_track(self._network, track_layer_list, '', lin_w, lin_b)
-    else:
+    elif quant.quantMethod is not None:
       quant.place_quant(self._network, lin_w, lin_b)
+    else:
+      pass
 
     if self._cur_task >= 1:
       train_dset, val_dset = data_manager.get_dataset_with_split(

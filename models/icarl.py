@@ -20,7 +20,7 @@ import quant
 EPSILON = 1e-8
 
 init_epoch =  170
-init_lr = 0.1
+init_lr = 0.05
 init_milestones = [60, 100, 140]
 init_lr_decay = 0.1
 init_weight_decay = 2e-4 # 0.0005
@@ -67,8 +67,10 @@ class iCaRL(BaseLearner):
     lin_w, lin_b = quant.save_lin_params(self._network)
     if quant.quantTrack:
         quant.place_track(self._network, track_layer_list, '', lin_w, lin_b)
-    else:
+    elif quant.quantMethod is not None:
       quant.place_quant(self._network, lin_w, lin_b)
+    else:
+      pass
 
     train_dataset = data_manager.get_dataset(
         np.arange(self._known_classes, self._total_classes),
