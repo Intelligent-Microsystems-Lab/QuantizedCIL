@@ -86,8 +86,14 @@ def place_quant(m, lin_w, lin_b, c_path='',):
       target_attr = getattr(m, attr_str)
       if isinstance(target_attr, nn.Conv2d):
         if not hasattr(target_attr, 'c1'):
+          if quantMethod == 'luq':
+            tmp_meth = Conv2d_LUQ
+          elif quantMethod == 'ours':
+            tmp_meth = Conv2d_Ours
+          else:
+            raise Exception('Unknown quant method: ' + quantMethod)
           setattr(m, attr_str,
-                  Conv2d_LUQ(in_channels=target_attr.in_channels,
+                  tmp_meth(in_channels=target_attr.in_channels,
                              out_channels=target_attr.out_channels,
                              kernel_size=target_attr.kernel_size,
                              stride=target_attr.stride,
@@ -438,12 +444,14 @@ class FLinearQ(Function):
   def forward(ctx, x, w, quantizeBwd, uname, h_out, h_bs):
     ctx.uname = uname
     ctx.save_for_backward(x, w, torch.tensor(quantizeBwd), h_out, h_bs)
-    output = F.linear(x, w)
+    output = x @ w
+    # output = F.linear(x, w)
     return output
 
   @staticmethod
   def backward(ctx, grad_output):
     x, w, quant, h_out, h_bs = ctx.saved_tensors
+    w = w.T
 
     if quant:
 
@@ -454,7 +462,10 @@ class FLinearQ(Function):
 
       grad_input = (grad_output_h1 @ w_h1) * 1/prime_factors(h_out.shape[0])
 
-      x_h2 = h_bs @ x
+      try:
+        x_h2 = h_bs @ x
+      except:
+        import pdb; pdb.set_trace()
       grad_output_h2 = grad_output.T @ h_bs
 
       # quant grad_output
@@ -469,22 +480,25 @@ class FLinearQ(Function):
 
       grad_w = grad_output.T @ x
 
-    return grad_input, grad_w, None, None, None, None
+    return grad_input, grad_w.T, None, None, None, None
 
 
 def grad_scale(x, scale):
+  # https://github.com/zhutmost/lsq-net
   y = x
   y_grad = x * scale
   return (y - y_grad).detach() + y_grad
 
 
 def round_pass(x):
+  # https://github.com/zhutmost/lsq-net
   y = x.round()
   y_grad = x
   return (y - y_grad).detach() + y_grad
 
 
 def lsq(x, s, Qn, Qp):
+  # https://github.com/zhutmost/lsq-net
   s_grad_scale = 1.0 / ((Qp * x.numel()) ** 0.5)
   s_scale = grad_scale(s, s_grad_scale)
 
@@ -494,6 +508,7 @@ def lsq(x, s, Qn, Qp):
   x = x * s_scale
 
   return x
+
 
 class Linear_Ours(nn.Linear):
 
@@ -546,7 +561,7 @@ class Linear_Ours(nn.Linear):
       # w_q = UniformQuantizeSawb.apply(
       #       self.weight, self.c1, self.c2, self.QpW, self.QnW)
 
-      w_q = lsq(self.weight, self.lsq_wgt, self.QpW, self.QnW)
+      w_q = lsq(self.weight, self.lsq_wgt, self.QnW, self.QpW)
 
       if torch.min(input) < 0:
         self.QnA = -2 ** (self.abits - 1) + 1
@@ -555,7 +570,7 @@ class Linear_Ours(nn.Linear):
       
       # qinput = UniformQuantizeSawb.apply(
       #       input, self.c1, self.c2, self.QpA, self.QnA)
-      qinput = lsq(input, self.lsq_act, self.QpA, self.QnA)
+      qinput = lsq(input, self.lsq_act, self.QnA, self.QpA)
 
       # w_q = self.weight
       # qinput = input
@@ -567,9 +582,109 @@ class Linear_Ours(nn.Linear):
       else:
         h_bs = self.hadamard_bs
 
-      output = FLinearQ.apply(qinput, w_q, self.quantizeBwd, self.uname, self.hadamard_out, h_bs,) + self.bias
+      output = FLinearQ.apply(qinput, w_q.T, self.quantizeBwd, self.uname, self.hadamard_out, h_bs,) + self.bias
+
+      # LUQ bwd
+      output = GradStochasticClippingQ.apply(
+        output, self.quantizeBwd, self.layerIdx, self.repeatBwd, self.uname)
 
     else:
       output = F.linear(input, self.weight, self.bias)
 
     return {'logits': output}
+
+
+class Conv2d_Ours(nn.Conv2d):
+
+  """docstring for Conv2d_BF16."""
+
+  def __init__(self, uname, *args, **kwargs):
+    super(Conv2d_Ours, self).__init__(*args, **kwargs)
+    self.fullName = ''
+    self.statistics = []
+    self.layerIdx = 0
+
+    self.alpha = Parameter(torch.tensor([1], dtype=torch.float32))
+    self.beta = Parameter(torch.tensor([1], dtype=torch.float32))
+    self.abits = quantBits
+    self.wbits = quantBits
+
+    self.QnW = -2 ** (self.wbits - 1) + 1 
+    self.QpW = 2 ** (self.wbits - 1) - 1
+    self.QnA = 0
+    self.QpA = 2 ** self.abits - 1
+
+
+    self.quantizeFwd = quantizeFwd
+    self.quantizeBwd = quantizeBwd
+
+    self.c1 = 12.1
+    self.c2 = 12.2
+    self.stochastic = quantGradRound
+    self.calibrate = quantCalibrate
+    self.repeatBwd = 1
+
+    self.uname = uname
+ 
+    biggest_pow2 = prime_factors(self.out_channels)
+    h = scipy.linalg.block_diag( *[hadamard(biggest_pow2)]* int(self.out_channels/biggest_pow2) )
+    self.register_buffer('hadamard_out', torch.tensor(h, dtype = self.weight.dtype))
+
+    biggest_pow2 = prime_factors(quantBatchSize)
+    h = scipy.linalg.block_diag( *[hadamard(biggest_pow2)]* int(quantBatchSize/biggest_pow2) )
+    self.register_buffer('hadamard_bs', torch.tensor(h, dtype = self.weight.dtype))
+
+    self.lsq_act = Parameter(torch.tensor([1.], dtype=torch.float32))
+    self.lsq_wgt = Parameter(torch.tensor([ self.weight.abs().mean() * 2 / np.sqrt(self.QpW) ], dtype=torch.float32))
+
+
+  def forward(self, input):
+
+    if self.quantizeFwd:
+      # w_q = UniformQuantizeSawb.apply(
+      #       self.weight, self.c1, self.c2, self.QpW, self.QnW)
+
+      w_q = lsq(self.weight, self.lsq_wgt, self.QnW, self.QpW)
+
+      # if torch.min(input) < 0:
+      #   self.QnA = -2 ** (self.abits - 1) + 1
+      #   self.QpA = 2 ** (self.wbits - 1) - 1
+
+      # qinput = UniformQuantizeSawb.apply(
+      #       input, self.c1, self.c2, self.QpA, self.QnA)
+      qinput = lsq(input, self.lsq_act, self.QnA, self.QpA)
+
+
+      # TODO: optimize speed of hadamard creation
+      if input.shape[0] != quantBatchSize:
+        biggest_pow2 = prime_factors(input.shape[0])
+        h_bs = torch.tensor(scipy.linalg.block_diag( *[hadamard(biggest_pow2)]* int(input.shape[0]/biggest_pow2) ), dtype= self.weight.dtype).to(self.weight.device)
+      else:
+        h_bs = self.hadamard_bs
+
+      qinput = torch.nn.functional.unfold(qinput, self.kernel_size, padding=self.padding, stride=self.stride).transpose(1, 2)
+      w_q = w_q.view(w_q.size(0), -1).t()
+
+
+      # out = qinput @ w_q
+      # import pdb; pdb.set_trace()
+
+      out = FLinearQ.apply(qinput, w_q, self.quantizeBwd, self.uname, self.hadamard_out, h_bs,)
+      # import pdb; pdb.set_trace()
+      # 
+
+      out = out.transpose(1, 2)
+      output = out.view((input.shape[0], self.out_channels, int(input.shape[-2]/self.stride[0]), int(input.shape[-1]/self.stride[1]))) + self.bias.view(1,-1,1,1)
+
+      # np.testing.assert_allclose(output_cmp.cpu().detach().numpy(), output.cpu().detach().numpy(), rtol=1e-05, atol=1e-2)
+
+      # output = FLinearQ.apply(qinput, w_q, self.quantizeBwd, self.uname, self.hadamard_out, h_bs,) + self.bias
+
+      # LUQ bwd
+      output = GradStochasticClippingQ.apply(
+        output, self.quantizeBwd, self.layerIdx, self.repeatBwd, self.uname)
+
+    else:
+      output = F.linear(input, self.weight, self.bias)
+
+    return output

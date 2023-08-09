@@ -9,4 +9,4 @@ export LD_LIBRARY_PATH=/afs/crc.nd.edu/user/c/cschaef6/.local/lib/cuda-12.1/lib6
 export LD_LIBRARY_PATH=/afs/crc.nd.edu/user/c/cschaef6/.local/lib/cudnn-linux-x86_64-8.8.1.3_cuda11-archive/lib:$LD_LIBRARY_PATH
 export LD_LIBRARY_PATH=/afs/crc.nd.edu/user/c/cschaef6/.local/lib/nccl_2.17.1-1+cuda11.0_x86_64/lib:$LD_LIBRARY_PATH
 
-python3 main.py -model $2 -init 20 -incre 20 -p benchmark -seed $1 --quantMethod="luq" --quantBits=$3
+python3 main.py -model $2 -init 20 -incre 20 -p benchmark -seed $1 # --quantMethod="luq" --quantBits=$3
