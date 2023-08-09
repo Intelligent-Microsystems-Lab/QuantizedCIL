@@ -54,7 +54,7 @@ class BiC(BaseLearner):
 
     lin_w, lin_b = quant.save_lin_params(self._network)
     if quant.quantTrack:
-        quant.place_track(self._network, track_layer_list, '', lin_w, lin_b)
+      quant.place_track(self._network, track_layer_list, '', lin_w, lin_b)
     elif quant.quantMethod is not None:
       quant.place_quant(self._network, lin_w, lin_b)
     else:
@@ -67,7 +67,8 @@ class BiC(BaseLearner):
           mode="train",
           appendent=self._get_memory(),
           val_samples_per_class=int(
-              self.args['split_ratio'] * self._memory_size / self._known_classes
+              self.args['split_ratio']
+              * self._memory_size / self._known_classes
           ),
       )
       self.val_loader = DataLoader(
@@ -113,19 +114,22 @@ class BiC(BaseLearner):
     self._log_bias_params()
 
     if quant.quantTrack:
-        # save grads
-        for gen_stats in ['train_acc', 'test_acc', 'loss']:
-          np.save('track_stats/' + self.date_str + '_' + self.args['dataset'] + '_' + self.args['model_name'] + '_' + str(self._cur_task) + '_'+gen_stats+'.npy', quant.track_stats[gen_stats])
-        for lname in track_layer_list:
-            if lname in quant.track_stats['grads']:
-                np.save('track_stats/' + self.date_str + '_' + self.args['dataset'] + '_' + self.args['model_name'] + '_' + str(self._cur_task) + lname + '.npy', torch.hstack(quant.track_stats['grads'][lname]).numpy())
-            if lname in quant.track_stats['grads']:
-                for stat_name in ['max', 'min', 'mean', 'norm']:
-                    np.save('track_stats/' + self.date_str + '_' + self.args['dataset'] + '_' + self.args['model_name'] + '_' + str(self._cur_task) + lname + '_'+stat_name+'.npy', torch.hstack(quant.track_stats['grad_stats'][lname][stat_name]).numpy())
+      # save grads
+      for gen_stats in ['train_acc', 'test_acc', 'loss']:
+        np.save('track_stats/' + self.date_str + '_' + self.args['dataset'] + '_' + self.args['model_name'] + '_' + str(
+            self._cur_task) + '_' + gen_stats + '.npy', quant.track_stats[gen_stats])
+      for lname in track_layer_list:
+        if lname in quant.track_stats['grads']:
+          np.save('track_stats/' + self.date_str + '_' + self.args['dataset'] + '_' + self.args['model_name'] + '_' + str(
+              self._cur_task) + lname + '.npy', torch.hstack(quant.track_stats['grads'][lname]).numpy())
+        if lname in quant.track_stats['grads']:
+          for stat_name in ['max', 'min', 'mean', 'norm']:
+            np.save('track_stats/' + self.date_str + '_' + self.args['dataset'] + '_' + self.args['model_name'] + '_' + str(
+                self._cur_task) + lname + '_' + stat_name + '.npy', torch.hstack(quant.track_stats['grad_stats'][lname][stat_name]).numpy())
 
   def _run(self, train_loader, test_loader, optimizer, scheduler, stage):
     prog_bar = tqdm(range(self.args['epochs']))
-    for _, epoch in enumerate(prog_bar): # range(1, epochs + 1):
+    for _, epoch in enumerate(prog_bar):  # range(1, epochs + 1):
       self._network.train()
       losses = 0.0
       for i, (_, inputs, targets) in enumerate(train_loader):
@@ -168,21 +172,21 @@ class BiC(BaseLearner):
           quant.track_stats["test_acc"].append(test_acc)
           quant.track_stats["loss"].append(float(loss))
         info = "{} => Task {}, Epoch {}/{} => Loss {:.3f}, Train_accy {:.3f}, Test_accy {:.3f}".format(
-          stage,
-          self._cur_task,
-          epoch,
-          self.args['epochs'],
-          losses / len(train_loader),
-          train_acc,
-          test_acc,
+            stage,
+            self._cur_task,
+            epoch,
+            self.args['epochs'],
+            losses / len(train_loader),
+            train_acc,
+            test_acc,
         )
       else:
         info = "{} => Task {}, Epoch {}/{} => Loss {:.3f}".format(
-          stage,
-          self._cur_task,
-          epoch,
-          self.args['epochs'],
-          losses / len(train_loader),
+            stage,
+            self._cur_task,
+            epoch,
+            self.args['epochs'],
+            losses / len(train_loader),
         )
 
       scheduler.step()
@@ -203,7 +207,8 @@ class BiC(BaseLearner):
         lambda p: id(p) not in ignored_params, self._network.parameters()
     )
     network_params = [
-        {"params": base_params, "lr": self.args['lr'], "weight_decay": self.args['weight_decay']},
+        {"params": base_params,
+         "lr": self.args['lr'], "weight_decay": self.args['weight_decay']},
         {
             "params": self._network.bias_layers.parameters(),
             "lr": 0,

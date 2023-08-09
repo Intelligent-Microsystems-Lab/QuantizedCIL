@@ -19,11 +19,11 @@ import quant
 
 EPSILON = 1e-8
 
-init_epoch =  170
+init_epoch = 170
 init_lr = 0.05
 init_milestones = [60, 100, 140]
 init_lr_decay = 0.1
-init_weight_decay = 2e-4 # 0.0005
+init_weight_decay = 2e-4  # 0.0005
 
 
 epochs = 170
@@ -66,7 +66,7 @@ class iCaRL(BaseLearner):
 
     lin_w, lin_b = quant.save_lin_params(self._network)
     if quant.quantTrack:
-        quant.place_track(self._network, track_layer_list, '', lin_w, lin_b)
+      quant.place_track(self._network, track_layer_list, '', lin_w, lin_b)
     elif quant.quantMethod is not None:
       quant.place_quant(self._network, lin_w, lin_b)
     else:
@@ -142,14 +142,17 @@ class iCaRL(BaseLearner):
 
     if quant.quantTrack:
         # save grads
-        for gen_stats in ['train_acc', 'test_acc', 'loss']:
-          np.save('track_stats/' + self.date_str + '_' + self.args['dataset'] + '_' + self.args['model_name'] + '_' + str(self._cur_task) + '_'+gen_stats+'.npy', quant.track_stats[gen_stats])
-        for lname in track_layer_list:
-            if lname in quant.track_stats['grads']:
-                np.save('track_stats/' + self.date_str + '_' + self.args['dataset'] + '_' + self.args['model_name'] + '_' + str(self._cur_task) + lname + '.npy', torch.hstack(quant.track_stats['grads'][lname]).numpy())
-            if lname in quant.track_stats['grads']:
-                for stat_name in ['max', 'min', 'mean', 'norm']:
-                    np.save('track_stats/' + self.date_str + '_' + self.args['dataset'] + '_' + self.args['model_name'] + '_' + str(self._cur_task) + lname + '_'+stat_name+'.npy', torch.hstack(quant.track_stats['grad_stats'][lname][stat_name]).numpy())
+      for gen_stats in ['train_acc', 'test_acc', 'loss']:
+        np.save('track_stats/' + self.date_str + '_' + self.args['dataset'] + '_' + self.args['model_name'] + '_' + str(
+            self._cur_task) + '_' + gen_stats + '.npy', quant.track_stats[gen_stats])
+      for lname in track_layer_list:
+        if lname in quant.track_stats['grads']:
+          np.save('track_stats/' + self.date_str + '_' + self.args['dataset'] + '_' + self.args['model_name'] + '_' + str(
+              self._cur_task) + lname + '.npy', torch.hstack(quant.track_stats['grads'][lname]).numpy())
+        if lname in quant.track_stats['grads']:
+          for stat_name in ['max', 'min', 'mean', 'norm']:
+            np.save('track_stats/' + self.date_str + '_' + self.args['dataset'] + '_' + self.args['model_name'] + '_' + str(
+                self._cur_task) + lname + '_' + stat_name + '.npy', torch.hstack(quant.track_stats['grad_stats'][lname][stat_name]).numpy())
 
   def _init_train(self, train_loader, test_loader, optimizer, scheduler):
     prog_bar = tqdm(range(self.args['init_epoch']))
@@ -191,14 +194,14 @@ class iCaRL(BaseLearner):
         #           grad_quant_bias[k] = .9 * grad_quant_bias[k] +  .1 * torch.mean(param.grad - unquantized_grad[k])
         #         else:
         #           grad_quant_bias[k] = torch.mean(unquantized_grad[k] - param.grad)
-        
+
         _, preds = torch.max(logits, dim=1)
         local_correct = preds.eq(targets.expand_as(preds)).cpu().sum()
         correct += preds.eq(targets.expand_as(preds)).cpu().sum()
         total += len(targets)
 
-      
-        local_train_acc = np.around(tensor2numpy(local_correct) * 100 / len(targets), decimals=2)
+        local_train_acc = np.around(tensor2numpy(
+            local_correct) * 100 / len(targets), decimals=2)
       train_acc = np.around(tensor2numpy(correct) * 100 / total, decimals=2)
 
       if epoch % 5 == 0:
@@ -210,20 +213,20 @@ class iCaRL(BaseLearner):
           quant.track_stats['test_acc'].append(test_acc)
           quant.track_stats['loss'].append(float(loss))
         info = "Task {}, Epoch {}/{} => Loss {:.3f}, Train_accy {:.2f}, Test_accy {:.2f}".format(
-          self._cur_task,
-          epoch + 1,
-          self.args['epochs'],
-          losses / len(train_loader),
-          train_acc,
-          test_acc,
+            self._cur_task,
+            epoch + 1,
+            self.args['epochs'],
+            losses / len(train_loader),
+            train_acc,
+            test_acc,
         )
       else:
         info = "Task {}, Epoch {}/{} => Loss {:.3f}, Train_accy {:.2f}".format(
-          self._cur_task,
-          epoch + 1,
-          self.args['epochs'],
-          losses / len(train_loader),
-          train_acc,
+            self._cur_task,
+            epoch + 1,
+            self.args['epochs'],
+            losses / len(train_loader),
+            train_acc,
         )
       scheduler.step()
       prog_bar.set_description(info)
@@ -263,8 +266,9 @@ class iCaRL(BaseLearner):
         local_correct = preds.eq(targets.expand_as(preds)).cpu().sum()
         correct += preds.eq(targets.expand_as(preds)).cpu().sum()
         total += len(targets)
-      
-        local_train_acc = np.around(tensor2numpy(local_correct) * 100 / len(targets), decimals=2)
+
+        local_train_acc = np.around(tensor2numpy(
+            local_correct) * 100 / len(targets), decimals=2)
       train_acc = np.around(tensor2numpy(correct) * 100 / total, decimals=2)
 
       if epoch % 5 == 0:
@@ -276,20 +280,20 @@ class iCaRL(BaseLearner):
           quant.track_stats['test_acc'].append(test_acc)
           quant.track_stats['loss'].append(float(loss))
         info = "Task {}, Epoch {}/{} => Loss {:.3f}, Train_accy {:.2f}, Test_accy {:.2f}".format(
-          self._cur_task,
-          epoch + 1,
-          self.args['epochs'],
-          losses / len(train_loader),
-          train_acc,
-          test_acc,
+            self._cur_task,
+            epoch + 1,
+            self.args['epochs'],
+            losses / len(train_loader),
+            train_acc,
+            test_acc,
         )
       else:
         info = "Task {}, Epoch {}/{} => Loss {:.3f}, Train_accy {:.2f}".format(
-          self._cur_task,
-          epoch + 1,
-          self.args['epochs'],
-          losses / len(train_loader),
-          train_acc,
+            self._cur_task,
+            epoch + 1,
+            self.args['epochs'],
+            losses / len(train_loader),
+            train_acc,
         )
       scheduler.step()
       prog_bar.set_description(info)

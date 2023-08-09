@@ -23,9 +23,10 @@ def load_json(settings_path):
 def update_message(method, argname, value):
   print(f"Update {argname} to {value} because {method} is used.")
 
+
 def eval_args(args):
   # prevent arguments conflict
-  if args.quantMethod=="luq":
+  if args.quantMethod == "luq":
     if not args.quantizeFwd:
       update_message("luq", "quantizeFwd", True)
       args.quantizeFwd = True
@@ -41,7 +42,7 @@ def eval_args(args):
     if args.quantizeTrack:
       update_message("luq", "quantizeTrack", False)
       args.quantizeTrack = False
-  elif args.quantMethod=="ours":
+  elif args.quantMethod == "ours":
     # TODO: add our quantization method
     if not args.quantizeFwd:
       update_message("ours", "quantizeFwd", True)
@@ -67,6 +68,7 @@ def eval_args(args):
       update_message("quantizeTrack", "quantizeBwd", False)
       args.quantizeBwd = False
   return args
+
 
 def setup_parser():
   parser = argparse.ArgumentParser(
@@ -105,7 +107,8 @@ def setup_parser():
   parser.add_argument('--init_milestones', nargs='+',
                       type=int, default=[60, 100, 140])
   parser.add_argument('--init_lr_decay', type=float, default=0.1)
-  parser.add_argument('--init_weight_decay', type=float, default=2e-4) # 0.0005
+  parser.add_argument('--init_weight_decay', type=float,
+                      default=2e-4)  # 0.0005
   parser.add_argument('--epochs', type=int, default=170)
   parser.add_argument('--lr', type=float, default=0.05)
   parser.add_argument('--milestones', nargs='+',
@@ -116,8 +119,6 @@ def setup_parser():
   parser.add_argument('--T', type=int, default=2)
   parser.add_argument('--lamda', type=float, default=3)
   parser.add_argument('--split_ratio', type=float, default=0.1)
-
-
 
   return parser
 

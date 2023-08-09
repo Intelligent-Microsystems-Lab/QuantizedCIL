@@ -15,7 +15,7 @@ def hadamard(n, dtype=int):
     lg2 = int(math.log(n, 2))
   if 2 ** lg2 != n:
     raise ValueError("n must be an positive integer, and n must be "
-                       "a power of 2")
+                     "a power of 2")
 
   H = np.array([[1]], dtype=dtype)
 
@@ -25,9 +25,10 @@ def hadamard(n, dtype=int):
 
   return H
 
+
 def biggest_power2_factor(n):
   factors = []
-  for i in range(1,n+1):
+  for i in range(1, n + 1):
     if n % i == 0:
       if math.log(i, 2).is_integer():
         factors.append(i)
@@ -36,4 +37,4 @@ def biggest_power2_factor(n):
 
 def make_hadamard(size_m):
   biggest_pow2 = biggest_power2_factor(size_m)
-  return scipy.linalg.block_diag( *[hadamard(biggest_pow2)]* int(size_m/biggest_pow2) )
+  return scipy.linalg.block_diag(*[hadamard(biggest_pow2)] * int(size_m / biggest_pow2))

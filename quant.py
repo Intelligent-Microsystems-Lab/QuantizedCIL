@@ -20,7 +20,8 @@ from squant_function import SQuant_func
 
 from hadamard import hadamard, prime_factors, make_hadamard
 
-track_stats = {'grads': {}, 'acts': {}, 'wgts': {}, 'grad_stats':{}, 'test_acc':[], 'train_acc':[], 'loss':[]}
+track_stats = {'grads': {}, 'acts': {}, 'wgts': {},
+               'grad_stats': {}, 'test_acc': [], 'train_acc': [], 'loss': []}
 calibrate_phase = False
 quantizeFwd = False
 quantizeBwd = False
@@ -34,6 +35,7 @@ quantBatchSize = 128
 quantGradMxScale = 1.
 
 scale_library = {'a': {}, 'w': {}, 'g': {}}
+
 
 def init_properties(obj, uname):
   obj.fullName = ''
@@ -62,7 +64,6 @@ def init_properties(obj, uname):
   obj.uname = uname
 
 
-
 def place_track(m, layer_list, c_path, lin_w, lin_b):
   track_stats['test_acc'] = []
   track_stats['train_acc'] = []
@@ -72,7 +73,8 @@ def place_track(m, layer_list, c_path, lin_w, lin_b):
     if isinstance(target_attr, nn.Conv2d):
       if not hasattr(target_attr, 'c1'):
         if c_path + '_' + attr_str in layer_list:
-          track_stats['grad_stats'][c_path + '_' + attr_str] = {'max':[], 'min':[],'norm':[], 'mean':[]}
+          track_stats['grad_stats'][c_path + '_'
+                                    + attr_str] = {'max': [], 'min': [], 'norm': [], 'mean': []}
           track_stats['grads'][c_path + '_' + attr_str] = []
           track_stats['acts'][c_path + '_' + attr_str] = []
           track_stats['wgts'][c_path + '_' + attr_str] = []
@@ -90,7 +92,8 @@ def place_track(m, layer_list, c_path, lin_w, lin_b):
     if isinstance(target_attr, nn.Linear) or isinstance(target_attr,
                                                         SimpleLinear):
       if c_path + '_' + attr_str in layer_list:
-        track_stats['grad_stats'][c_path + '_' + attr_str] = {'max':[], 'min':[],'norm':[], 'mean':[]}
+        track_stats['grad_stats'][c_path + '_'
+                                  + attr_str] = {'max': [], 'min': [], 'norm': [], 'mean': []}
         track_stats['grads'][c_path + '_' + attr_str] = []
         track_stats['acts'][c_path + '_' + attr_str] = []
         track_stats['wgts'][c_path + '_' + attr_str] = []
@@ -121,15 +124,15 @@ def place_quant(m, lin_w, lin_b, c_path='',):
             raise Exception('Unknown quant method: ' + quantMethod)
           setattr(m, attr_str,
                   tmp_meth(in_channels=target_attr.in_channels,
-                             out_channels=target_attr.out_channels,
-                             kernel_size=target_attr.kernel_size,
-                             stride=target_attr.stride,
-                             padding=target_attr.padding,
-                             padding_mode=target_attr.padding_mode,
-                             dilation=target_attr.dilation,
-                             groups=target_attr.groups,
-                             bias=hasattr(target_attr, 'bias'),
-                             uname=c_path + '_' + attr_str,))
+                           out_channels=target_attr.out_channels,
+                           kernel_size=target_attr.kernel_size,
+                           stride=target_attr.stride,
+                           padding=target_attr.padding,
+                           padding_mode=target_attr.padding_mode,
+                           dilation=target_attr.dilation,
+                           groups=target_attr.groups,
+                           bias=hasattr(target_attr, 'bias'),
+                           uname=c_path + '_' + attr_str,))
       if isinstance(target_attr, nn.Linear) or isinstance(target_attr,
                                                           SimpleLinear):
         if quantMethod == 'luq':
@@ -139,9 +142,9 @@ def place_quant(m, lin_w, lin_b, c_path='',):
         else:
           raise Exception('Unknown quant method: ' + quantMethod)
         setattr(m, attr_str, tmp_meth(in_features=target_attr.in_features,
-                                        out_features=target_attr.out_features,
-                                        bias=hasattr(target_attr, 'bias'),
-                                        uname=c_path + '_' + attr_str,))
+                                      out_features=target_attr.out_features,
+                                      bias=hasattr(target_attr, 'bias'),
+                                      uname=c_path + '_' + attr_str,))
         if lin_w is not None:
           m.fc.weight = nn.Parameter(lin_w)
         if lin_b is not None:
@@ -229,9 +232,9 @@ class GradTrack(Function):
     track_stats['grads'][ctx.name].append(grad_output.flatten(
     )[torch.randint(size_total, (int(size_total * .01),))].cpu())
 
-
     # grad norm
-    track_stats['grad_stats'][ctx.name]['norm'].append(torch.linalg.vector_norm(grad_output.flatten()).cpu())
+    track_stats['grad_stats'][ctx.name]['norm'].append(
+        torch.linalg.vector_norm(grad_output.flatten()).cpu())
 
     # grad max
     track_stats['grad_stats'][ctx.name]['max'].append(grad_output.max().cpu())
@@ -240,8 +243,8 @@ class GradTrack(Function):
     track_stats['grad_stats'][ctx.name]['min'].append(grad_output.min().cpu())
 
     # grad mean
-    track_stats['grad_stats'][ctx.name]['mean'].append(grad_output.mean().cpu())
-
+    track_stats['grad_stats'][ctx.name]['mean'].append(
+        grad_output.mean().cpu())
 
     return grad_output, None
 
@@ -274,9 +277,6 @@ class UniformQuantizeSawb(InplaceFunction):
     return grad_input, None, None, None, None
 
 
-
-
-
 class Linear_LUQ(nn.Linear):
 
   """docstring for Conv2d_BF16."""
@@ -288,16 +288,16 @@ class Linear_LUQ(nn.Linear):
   def forward(self, input):
 
     if self.quantizeFwd:
-      
+
       w_q = UniformQuantizeSawb.apply(
-            self.weight, self.c1, self.c2, self.QpW, self.QnW)
+          self.weight, self.c1, self.c2, self.QpW, self.QnW)
 
       if torch.min(input) < 0:
         self.QnA = -2 ** (self.abits - 1) + 1
         self.QpA = 2 ** (self.wbits - 1) - 1
 
       qinput = UniformQuantizeSawb.apply(
-            input, self.c1, self.c2, self.QpA, self.QnA)
+          input, self.c1, self.c2, self.QpA, self.QnA)
 
       # all
       output = F.linear(qinput, w_q, self.bias)
@@ -322,14 +322,14 @@ class Conv2d_LUQ(nn.Conv2d):
 
     if self.quantizeFwd:
       w_q = UniformQuantizeSawb.apply(
-            self.weight, self.c1, self.c2, self.QpW, self.QnW)
+          self.weight, self.c1, self.c2, self.QpW, self.QnW)
 
       if torch.min(input) < 0:
         self.QnA = -2 ** (self.abits - 1) + 1
         self.QpA = 2 ** (self.wbits - 1) - 1
 
       qinput = UniformQuantizeSawb.apply(
-            input, self.c1, self.c2, self.QpA, self.QnA)
+          input, self.c1, self.c2, self.QpA, self.QnA)
 
       # all
       output = F.conv2d(qinput, w_q, self.bias, self.stride,
@@ -362,7 +362,8 @@ class GradStochasticClippingQ(Function):
         mx = torch.max(grad_output.abs())
 
         bits = quantBits - 1
-        alpha = mx / 2**(2**bits - 2) # was 1 before, need to be 2 centered around 0
+        # was 1 before, need to be 2 centered around 0
+        alpha = mx / 2**(2**bits - 2)
 
         if quantGradRound == "stochastic":
           alphaEps = alpha * \
@@ -390,7 +391,7 @@ class GradStochasticClippingQ(Function):
             ((grad_inputQ.abs() / alpha) + noise) * 4 / 3)) * alpha
 
         grad_inputQ = torch.sign(grad_input) * torch.where(grad_inputQ < (alpha * (2 ** torch.floor(torch.log2(((grad_input.abs() / alpha)))))), 
-            alpha * (2 ** torch.floor(torch.log2(((grad_input.abs() / alpha))))), grad_inputQ)
+                                                           alpha * (2 ** torch.floor(torch.log2(((grad_input.abs() / alpha))))), grad_inputQ)
         grad_inputQ = torch.where(grad_input == 0, torch.tensor(
             [0], dtype=torch.float, device=grad_output.device), grad_inputQ)
 
@@ -401,10 +402,7 @@ class GradStochasticClippingQ(Function):
     else:
       grad_input = grad_output
 
-
     return grad_input, None, None, None, None
-
-
 
 
 class FLinearQ(torch.autograd.Function):
@@ -420,7 +418,6 @@ class FLinearQ(torch.autograd.Function):
   def setup_context(ctx, inputs, output):
     ctx.save_for_backward(inputs[0], inputs[1], inputs[2], inputs[3])
 
-
   @staticmethod
   def backward(ctx, grad_output):
     x, w, h_out, h_bs = ctx.saved_tensors
@@ -433,18 +430,18 @@ class FLinearQ(torch.autograd.Function):
 
     # quant grad_output
 
-    grad_input = (grad_output_h1 @ w_h1) * 1/prime_factors(h_out.shape[0])
+    grad_input = (grad_output_h1 @ w_h1) * 1 / prime_factors(h_out.shape[0])
 
     x_h2 = h_bs @ x
     grad_output_h2 = grad_output.T @ h_bs
 
     # quant grad_output
 
-    grad_w = (grad_output_h2 @ x_h2) * 1/prime_factors(h_bs.shape[0])
+    grad_w = (grad_output_h2 @ x_h2) * 1 / prime_factors(h_bs.shape[0])
 
     # np.testing.assert_allclose(grad_w.cpu(), (grad_output.T @ x).cpu())
     # np.testing.assert_allclose(grad_input.cpu(), (grad_output @ w).cpu() )
-      
+
     # else:
     #   grad_input = grad_output @ w
 
@@ -488,12 +485,14 @@ class Linear_Ours(nn.Linear):
     super(Linear_Ours, self).__init__(*args, **kwargs)
     init_properties(self, uname)
 
-    self.register_buffer('hadamard_out', torch.tensor(make_hadamard(self.out_features), dtype = self.weight.dtype))
-    self.register_buffer('hadamard_bs', torch.tensor(make_hadamard(quantBatchSize), dtype = self.weight.dtype))
+    self.register_buffer('hadamard_out', torch.tensor(
+        make_hadamard(self.out_features), dtype=self.weight.dtype))
+    self.register_buffer('hadamard_bs', torch.tensor(
+        make_hadamard(quantBatchSize), dtype=self.weight.dtype))
 
     self.lsq_act = Parameter(torch.tensor([1.], dtype=torch.float32))
-    self.lsq_wgt = Parameter(torch.tensor([ self.weight.abs().mean() * 2 / np.sqrt(self.QpW) ], dtype=torch.float32))
-
+    self.lsq_wgt = Parameter(torch.tensor(
+        [self.weight.abs().mean() * 2 / np.sqrt(self.QpW)], dtype=torch.float32))
 
   def forward(self, input):
 
@@ -507,7 +506,6 @@ class Linear_Ours(nn.Linear):
         self.QnA = -2 ** (self.abits - 1) + 1
         self.QpA = 2 ** (self.wbits - 1) - 1
 
-      
       # qinput = UniformQuantizeSawb.apply(
       #       input, self.c1, self.c2, self.QpA, self.QnA)
       # qinput = lsq(input, self.lsq_act, self.QnA, self.QpA)
@@ -518,7 +516,8 @@ class Linear_Ours(nn.Linear):
       # TODO: optimize speed of hadamard creation
       if input.shape[0] != quantBatchSize:
         # biggest_pow2 = prime_factors(input.shape[0])
-        h_bs = torch.tensor(make_hadamard(input.shape[0]), dtype=self.weight.dtype).to(self.weight.device)
+        h_bs = torch.tensor(make_hadamard(
+            input.shape[0]), dtype=self.weight.dtype).to(self.weight.device)
       else:
         h_bs = self.hadamard_bs
 
@@ -541,13 +540,15 @@ class Conv2d_Ours(nn.Conv2d):
   def __init__(self, uname, *args, **kwargs):
     super(Conv2d_Ours, self).__init__(*args, **kwargs)
     init_properties(self, uname)
- 
-    self.register_buffer('hadamard_out', torch.tensor(make_hadamard(self.out_channels), dtype = self.weight.dtype))
-    self.register_buffer('hadamard_bs', torch.tensor(torch.zeros((1,1)), dtype = self.weight.dtype))
+
+    self.register_buffer('hadamard_out', torch.tensor(
+        make_hadamard(self.out_channels), dtype=self.weight.dtype))
+    self.register_buffer('hadamard_bs', torch.tensor(
+        torch.zeros((1, 1)), dtype=self.weight.dtype))
 
     self.lsq_act = Parameter(torch.tensor([1.], dtype=torch.float32))
-    self.lsq_wgt = Parameter(torch.tensor([ self.weight.abs().mean() * 2 / np.sqrt(self.QpW) ], dtype=torch.float32))
-
+    self.lsq_wgt = Parameter(torch.tensor(
+        [self.weight.abs().mean() * 2 / np.sqrt(self.QpW)], dtype=torch.float32))
 
   def forward(self, input):
 
@@ -569,26 +570,26 @@ class Conv2d_Ours(nn.Conv2d):
       qinput = input
 
       # TODO: optimize speed of hadamard creation
-      
-        
 
-      qinput = torch.nn.functional.unfold(qinput, self.kernel_size, padding=self.padding, stride=self.stride).transpose(1, 2)
+      qinput = torch.nn.functional.unfold(
+          qinput, self.kernel_size, padding=self.padding, stride=self.stride).transpose(1, 2)
       w_q = w_q.view(w_q.size(0), -1).t()
 
-
       if self.hadamard_bs.sum() == 0:
-        self.hadamard_bs = torch.tensor(make_hadamard(qinput.shape[1]), dtype = self.weight.dtype).to(self.weight.device)
+        self.hadamard_bs = torch.tensor(make_hadamard(
+            qinput.shape[1]), dtype=self.weight.dtype).to(self.weight.device)
 
-      
       flinearq_fn = torch.vmap(FLinearQ.apply)
-      out = flinearq_fn(qinput, w_q.T.unsqueeze(0).repeat(qinput.shape[0], 1, 1), self.hadamard_out.unsqueeze(0).repeat(qinput.shape[0], 1, 1), self.hadamard_bs.unsqueeze(0).repeat(qinput.shape[0], 1, 1))
+      out = flinearq_fn(qinput, w_q.T.unsqueeze(0).repeat(qinput.shape[0], 1, 1), self.hadamard_out.unsqueeze(
+          0).repeat(qinput.shape[0], 1, 1), self.hadamard_bs.unsqueeze(0).repeat(qinput.shape[0], 1, 1))
 
       # out = FLinearQ.apply(qinput, w_q, self.hadamard_out, h_bs,)
       # import pdb; pdb.set_trace()
       # 
 
       out = out.transpose(1, 2)
-      output = out.view((input.shape[0], self.out_channels, int(input.shape[-2]/self.stride[0]), int(input.shape[-1]/self.stride[1]))) + self.bias.view(1,-1,1,1)
+      output = out.view((input.shape[0], self.out_channels, int(
+          input.shape[-2] / self.stride[0]), int(input.shape[-1] / self.stride[1]))) + self.bias.view(1, -1, 1, 1)
 
       # np.testing.assert_allclose(output_cmp.cpu().detach().numpy(), output.cpu().detach().numpy(), rtol=1e-05, atol=1e-2)
 

@@ -118,7 +118,7 @@ def get_backbone(backbone_type, pretrained=False, args=None):
   elif name == 'memo_resnet50_imagenet':
     g_blcoks, s_blocks = memo_resnet50_imagenet()
     return g_blcoks, s_blocks
-  
+
   elif name == 'fcnet' and args is not None:
     return FCNet(args.in_dim, args.hid_dim, args.out_dim, args.nr_hid_layers,
                  args.act_fun)
