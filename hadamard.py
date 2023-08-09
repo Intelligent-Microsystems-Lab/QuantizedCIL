@@ -3,6 +3,7 @@
 # Quantized training.
 import math
 import numpy as np
+import scipy
 
 
 def hadamard(n, dtype=int):
@@ -24,10 +25,15 @@ def hadamard(n, dtype=int):
 
   return H
 
-def prime_factors(n):
+def biggest_power2_factor(n):
   factors = []
   for i in range(1,n+1):
     if n % i == 0:
       if math.log(i, 2).is_integer():
         factors.append(i)
   return max(factors)
+
+
+def make_hadamard(size_m):
+  biggest_pow2 = biggest_power2_factor(size_m)
+  return scipy.linalg.block_diag( *[hadamard(biggest_pow2)]* int(size_m/biggest_pow2) )

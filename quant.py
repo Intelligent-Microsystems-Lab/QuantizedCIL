@@ -18,7 +18,7 @@ from backbones.linears import SimpleLinear
 
 from squant_function import SQuant_func
 
-from hadamard import hadamard, prime_factors
+from hadamard import hadamard, prime_factors, make_hadamard
 
 track_stats = {'grads': {}, 'acts': {}, 'wgts': {}, 'grad_stats':{}, 'test_acc':[], 'train_acc':[], 'loss':[]}
 calibrate_phase = False
@@ -34,6 +34,32 @@ quantBatchSize = 128
 quantGradMxScale = 1.
 
 scale_library = {'a': {}, 'w': {}, 'g': {}}
+
+def init_properties(obj, uname):
+  obj.fullName = ''
+  obj.statistics = []
+  obj.layerIdx = 0
+
+  # obj.alpha = Parameter(torch.tensor([1], dtype=torch.float32))
+  # obj.beta = Parameter(torch.tensor([1], dtype=torch.float32))
+  obj.abits = quantBits
+  obj.wbits = quantBits
+
+  obj.QnW = -2 ** (obj.wbits - 1) + 1
+  obj.QpW = 2 ** (obj.wbits - 1) - 1
+  obj.QnA = 0
+  obj.QpA = 2 ** obj.abits - 1 
+
+  obj.quantizeFwd = quantizeFwd
+  obj.quantizeBwd = quantizeBwd
+
+  obj.c1 = 12.1
+  obj.c2 = 12.2
+  obj.stochastic = quantGradRound
+  obj.calibrate = quantCalibrate
+  obj.repeatBwd = 1
+
+  obj.uname = uname
 
 
 
@@ -257,36 +283,7 @@ class Linear_LUQ(nn.Linear):
 
   def __init__(self, uname, *args, **kwargs):
     super(Linear_LUQ, self).__init__(*args, **kwargs)
-    self.fullName = ''
-    self.statistics = []
-    self.layerIdx = 0
-
-    self.alpha = Parameter(torch.tensor([1], dtype=torch.float32))
-    self.beta = Parameter(torch.tensor([1], dtype=torch.float32))
-    self.abits = quantBits
-    self.wbits = quantBits
-
-    self.QnW = -2 ** (self.wbits - 1) + 1
-    self.QpW = 2 ** (self.wbits - 1) - 1
-    self.QnA = 0
-    self.QpA = 2 ** self.abits - 1
-
-    self.register_buffer('init_stateW', torch.zeros(1))
-    self.register_buffer('init_stateA', torch.zeros(1))
-
-    self.register_buffer('gradScaleW', torch.zeros(1))
-    self.register_buffer('gradScaleA', torch.zeros(1))
-
-    self.quantizeFwd = quantizeFwd
-    self.quantizeBwd = quantizeBwd
-
-    self.c1 = 12.1
-    self.c2 = 12.2
-    self.stochastic = quantGradRound
-    self.calibrate = quantCalibrate
-    self.repeatBwd = 1
-
-    self.uname = uname
+    init_properties(self, uname)
 
   def forward(self, input):
 
@@ -319,36 +316,7 @@ class Conv2d_LUQ(nn.Conv2d):
 
   def __init__(self, uname, *args, **kwargs):
     super(Conv2d_LUQ, self).__init__(*args, **kwargs)
-    self.fullName = ''
-    self.statistics = []
-    self.layerIdx = 0
-
-    self.alpha = Parameter(torch.tensor([1], dtype=torch.float32))
-    self.beta = Parameter(torch.tensor([1], dtype=torch.float32))
-    self.abits = quantBits
-    self.wbits = quantBits
-
-    self.QnW = -2 ** (self.wbits - 1) + 1
-    self.QpW = 2 ** (self.wbits - 1) - 1
-    self.QnA = 0
-    self.QpA = 2 ** self.abits - 1 
-
-    self.register_buffer('init_stateW', torch.zeros(1))
-    self.register_buffer('init_stateA', torch.zeros(1))
-
-    self.register_buffer('gradScaleW', torch.zeros(1))
-    self.register_buffer('gradScaleA', torch.zeros(1))
-
-    self.quantizeFwd = quantizeFwd
-    self.quantizeBwd = quantizeBwd
-
-    self.c1 = 12.1
-    self.c2 = 12.2
-    self.stochastic = quantGradRound
-    self.calibrate = quantCalibrate
-    self.repeatBwd = 1
-
-    self.uname = uname
+    init_properties(self, uname)
 
   def forward(self, input):
 
@@ -518,40 +486,10 @@ class Linear_Ours(nn.Linear):
 
   def __init__(self, uname, *args, **kwargs):
     super(Linear_Ours, self).__init__(*args, **kwargs)
-    self.fullName = ''
-    self.statistics = []
-    self.layerIdx = 0
+    init_properties(self, uname)
 
-    self.alpha = Parameter(torch.tensor([1], dtype=torch.float32))
-    self.beta = Parameter(torch.tensor([1], dtype=torch.float32))
-    self.abits = quantBits
-    self.wbits = quantBits
-
-    self.QnW = -2 ** (self.wbits - 1) + 1 
-    self.QpW = 2 ** (self.wbits - 1) - 1
-    self.QnA = 0
-    self.QpA = 2 ** self.abits - 1
-
-
-    self.quantizeFwd = quantizeFwd
-    self.quantizeBwd = quantizeBwd
-
-    self.c1 = 12.1
-    self.c2 = 12.2
-    self.stochastic = quantGradRound
-    self.calibrate = quantCalibrate
-    self.repeatBwd = 1
-
-    self.uname = uname
-
-    
-    biggest_pow2 = prime_factors(self.out_features)
-    h = scipy.linalg.block_diag( *[hadamard(biggest_pow2)]* int(self.out_features/biggest_pow2) )
-    self.register_buffer('hadamard_out', torch.tensor(h, dtype = self.weight.dtype))
-
-    biggest_pow2 = prime_factors(quantBatchSize)
-    h = scipy.linalg.block_diag( *[hadamard(biggest_pow2)]* int(quantBatchSize/biggest_pow2) )
-    self.register_buffer('hadamard_bs', torch.tensor(h, dtype = self.weight.dtype))
+    self.register_buffer('hadamard_out', torch.tensor(make_hadamard(self.out_features), dtype = self.weight.dtype))
+    self.register_buffer('hadamard_bs', torch.tensor(make_hadamard(quantBatchSize), dtype = self.weight.dtype))
 
     self.lsq_act = Parameter(torch.tensor([1.], dtype=torch.float32))
     self.lsq_wgt = Parameter(torch.tensor([ self.weight.abs().mean() * 2 / np.sqrt(self.QpW) ], dtype=torch.float32))
@@ -579,8 +517,8 @@ class Linear_Ours(nn.Linear):
 
       # TODO: optimize speed of hadamard creation
       if input.shape[0] != quantBatchSize:
-        biggest_pow2 = prime_factors(input.shape[0])
-        h_bs = torch.tensor(scipy.linalg.block_diag( *[hadamard(biggest_pow2)]* int(input.shape[0]/biggest_pow2) ), dtype=self.weight.dtype).to(self.weight.device)
+        # biggest_pow2 = prime_factors(input.shape[0])
+        h_bs = torch.tensor(make_hadamard(input.shape[0]), dtype=self.weight.dtype).to(self.weight.device)
       else:
         h_bs = self.hadamard_bs
 
@@ -602,38 +540,9 @@ class Conv2d_Ours(nn.Conv2d):
 
   def __init__(self, uname, *args, **kwargs):
     super(Conv2d_Ours, self).__init__(*args, **kwargs)
-    self.fullName = ''
-    self.statistics = []
-    self.layerIdx = 0
-
-    self.alpha = Parameter(torch.tensor([1], dtype=torch.float32))
-    self.beta = Parameter(torch.tensor([1], dtype=torch.float32))
-    self.abits = quantBits
-    self.wbits = quantBits
-
-    self.QnW = -2 ** (self.wbits - 1) + 1 
-    self.QpW = 2 ** (self.wbits - 1) - 1
-    self.QnA = 0
-    self.QpA = 2 ** self.abits - 1
-
-
-    self.quantizeFwd = quantizeFwd
-    self.quantizeBwd = quantizeBwd
-
-    self.c1 = 12.1
-    self.c2 = 12.2
-    self.stochastic = quantGradRound
-    self.calibrate = quantCalibrate
-    self.repeatBwd = 1
-
-    self.uname = uname
+    init_properties(self, uname)
  
-    biggest_pow2 = prime_factors(self.out_channels)
-    h = scipy.linalg.block_diag( *[hadamard(biggest_pow2)]* int(self.out_channels/biggest_pow2) )
-    self.register_buffer('hadamard_out', torch.tensor(h, dtype = self.weight.dtype))
-
-    # biggest_pow2 = prime_factors(quantBatchSize)
-    # h = scipy.linalg.block_diag( *[hadamard(biggest_pow2)]* int(quantBatchSize/biggest_pow2) )
+    self.register_buffer('hadamard_out', torch.tensor(make_hadamard(self.out_channels), dtype = self.weight.dtype))
     self.register_buffer('hadamard_bs', torch.tensor(torch.zeros((1,1)), dtype = self.weight.dtype))
 
     self.lsq_act = Parameter(torch.tensor([1.], dtype=torch.float32))
@@ -668,8 +577,7 @@ class Conv2d_Ours(nn.Conv2d):
 
 
       if self.hadamard_bs.sum() == 0:
-        biggest_pow2 = prime_factors(qinput.shape[1])
-        self.hadamard_bs = torch.tensor(scipy.linalg.block_diag( *[hadamard(biggest_pow2)]* int((qinput.shape[1])/biggest_pow2) ), dtype= self.weight.dtype).to(self.weight.device)
+        self.hadamard_bs = torch.tensor(make_hadamard(qinput.shape[1]), dtype = self.weight.dtype).to(self.weight.device)
 
       
       flinearq_fn = torch.vmap(FLinearQ.apply)
