@@ -4,6 +4,7 @@
 
 import scipy
 import numpy as np
+import functools
 
 import torch
 import torch.nn as nn
@@ -438,49 +439,50 @@ class GradStochasticClippingQ(Function):
 
 
 
-class FLinearQ(Function):
+class FLinearQ(torch.autograd.Function):
+  generate_vmap_rule = True
 
   @staticmethod
-  def forward(ctx, x, w, quantizeBwd, uname, h_out, h_bs):
-    ctx.uname = uname
-    ctx.save_for_backward(x, w, torch.tensor(quantizeBwd), h_out, h_bs)
-    output = x @ w
-    # output = F.linear(x, w)
+  def forward(x, w, h_out, h_bs):
+    # output = x @ w
+    output = F.linear(x, w)
     return output
 
   @staticmethod
+  def setup_context(ctx, inputs, output):
+    ctx.save_for_backward(inputs[0], inputs[1], inputs[2], inputs[3])
+
+
+  @staticmethod
   def backward(ctx, grad_output):
-    x, w, quant, h_out, h_bs = ctx.saved_tensors
-    w = w.T
+    x, w, h_out, h_bs = ctx.saved_tensors
+    # w = w.T
 
-    if quant:
+    # if quant:
 
-      w_h1 = h_out @ w
-      grad_output_h1 = grad_output @ h_out
+    w_h1 = h_out @ w
+    grad_output_h1 = grad_output @ h_out
 
-      # quant grad_output
+    # quant grad_output
 
-      grad_input = (grad_output_h1 @ w_h1) * 1/prime_factors(h_out.shape[0])
+    grad_input = (grad_output_h1 @ w_h1) * 1/prime_factors(h_out.shape[0])
 
-      try:
-        x_h2 = h_bs @ x
-      except:
-        import pdb; pdb.set_trace()
-      grad_output_h2 = grad_output.T @ h_bs
+    x_h2 = h_bs @ x
+    grad_output_h2 = grad_output.T @ h_bs
 
-      # quant grad_output
+    # quant grad_output
 
-      grad_w = (grad_output_h2 @ x_h2) * 1/prime_factors(h_bs.shape[0])
+    grad_w = (grad_output_h2 @ x_h2) * 1/prime_factors(h_bs.shape[0])
 
-      # np.testing.assert_allclose(grad_w.cpu(), (grad_output.T @ x).cpu())
-      # np.testing.assert_allclose(grad_input.cpu(), (grad_output @ w).cpu() )
+    # np.testing.assert_allclose(grad_w.cpu(), (grad_output.T @ x).cpu())
+    # np.testing.assert_allclose(grad_input.cpu(), (grad_output @ w).cpu() )
       
-    else:
-      grad_input = grad_output @ w
+    # else:
+    #   grad_input = grad_output @ w
 
-      grad_w = grad_output.T @ x
+    #   grad_w = grad_output.T @ x
 
-    return grad_input, grad_w.T, None, None, None, None
+    return grad_input, grad_w, None, None, None, None
 
 
 def grad_scale(x, scale):
@@ -561,7 +563,7 @@ class Linear_Ours(nn.Linear):
       # w_q = UniformQuantizeSawb.apply(
       #       self.weight, self.c1, self.c2, self.QpW, self.QnW)
 
-      w_q = lsq(self.weight, self.lsq_wgt, self.QnW, self.QpW)
+      # w_q = lsq(self.weight, self.lsq_wgt, self.QnW, self.QpW)
 
       if torch.min(input) < 0:
         self.QnA = -2 ** (self.abits - 1) + 1
@@ -570,10 +572,10 @@ class Linear_Ours(nn.Linear):
       
       # qinput = UniformQuantizeSawb.apply(
       #       input, self.c1, self.c2, self.QpA, self.QnA)
-      qinput = lsq(input, self.lsq_act, self.QnA, self.QpA)
+      # qinput = lsq(input, self.lsq_act, self.QnA, self.QpA)
 
-      # w_q = self.weight
-      # qinput = input
+      w_q = self.weight
+      qinput = input
 
       # TODO: optimize speed of hadamard creation
       if input.shape[0] != quantBatchSize:
@@ -582,11 +584,11 @@ class Linear_Ours(nn.Linear):
       else:
         h_bs = self.hadamard_bs
 
-      output = FLinearQ.apply(qinput, w_q.T, self.quantizeBwd, self.uname, self.hadamard_out, h_bs,) + self.bias
+      output = FLinearQ.apply(qinput, w_q, self.hadamard_out, h_bs) + self.bias
 
       # LUQ bwd
-      output = GradStochasticClippingQ.apply(
-        output, self.quantizeBwd, self.layerIdx, self.repeatBwd, self.uname)
+      # output = GradStochasticClippingQ.apply(
+      #   output, self.quantizeBwd, self.layerIdx, self.repeatBwd, self.uname)
 
     else:
       output = F.linear(input, self.weight, self.bias)
@@ -630,9 +632,9 @@ class Conv2d_Ours(nn.Conv2d):
     h = scipy.linalg.block_diag( *[hadamard(biggest_pow2)]* int(self.out_channels/biggest_pow2) )
     self.register_buffer('hadamard_out', torch.tensor(h, dtype = self.weight.dtype))
 
-    biggest_pow2 = prime_factors(quantBatchSize)
-    h = scipy.linalg.block_diag( *[hadamard(biggest_pow2)]* int(quantBatchSize/biggest_pow2) )
-    self.register_buffer('hadamard_bs', torch.tensor(h, dtype = self.weight.dtype))
+    # biggest_pow2 = prime_factors(quantBatchSize)
+    # h = scipy.linalg.block_diag( *[hadamard(biggest_pow2)]* int(quantBatchSize/biggest_pow2) )
+    self.register_buffer('hadamard_bs', torch.tensor(torch.zeros((1,1)), dtype = self.weight.dtype))
 
     self.lsq_act = Parameter(torch.tensor([1.], dtype=torch.float32))
     self.lsq_wgt = Parameter(torch.tensor([ self.weight.abs().mean() * 2 / np.sqrt(self.QpW) ], dtype=torch.float32))
@@ -644,7 +646,7 @@ class Conv2d_Ours(nn.Conv2d):
       # w_q = UniformQuantizeSawb.apply(
       #       self.weight, self.c1, self.c2, self.QpW, self.QnW)
 
-      w_q = lsq(self.weight, self.lsq_wgt, self.QnW, self.QpW)
+      # w_q = lsq(self.weight, self.lsq_wgt, self.QnW, self.QpW)
 
       # if torch.min(input) < 0:
       #   self.QnA = -2 ** (self.abits - 1) + 1
@@ -652,24 +654,28 @@ class Conv2d_Ours(nn.Conv2d):
 
       # qinput = UniformQuantizeSawb.apply(
       #       input, self.c1, self.c2, self.QpA, self.QnA)
-      qinput = lsq(input, self.lsq_act, self.QnA, self.QpA)
+      # qinput = lsq(input, self.lsq_act, self.QnA, self.QpA)
 
+      w_q = self.weight
+      qinput = input
 
       # TODO: optimize speed of hadamard creation
-      if input.shape[0] != quantBatchSize:
-        biggest_pow2 = prime_factors(input.shape[0])
-        h_bs = torch.tensor(scipy.linalg.block_diag( *[hadamard(biggest_pow2)]* int(input.shape[0]/biggest_pow2) ), dtype= self.weight.dtype).to(self.weight.device)
-      else:
-        h_bs = self.hadamard_bs
+      
+        
 
       qinput = torch.nn.functional.unfold(qinput, self.kernel_size, padding=self.padding, stride=self.stride).transpose(1, 2)
       w_q = w_q.view(w_q.size(0), -1).t()
 
 
-      # out = qinput @ w_q
-      # import pdb; pdb.set_trace()
+      if self.hadamard_bs.sum() == 0:
+        biggest_pow2 = prime_factors(qinput.shape[1])
+        self.hadamard_bs = torch.tensor(scipy.linalg.block_diag( *[hadamard(biggest_pow2)]* int((qinput.shape[1])/biggest_pow2) ), dtype= self.weight.dtype).to(self.weight.device)
 
-      out = FLinearQ.apply(qinput, w_q, self.quantizeBwd, self.uname, self.hadamard_out, h_bs,)
+      
+      flinearq_fn = torch.vmap(FLinearQ.apply)
+      out = flinearq_fn(qinput, w_q.T.unsqueeze(0).repeat(qinput.shape[0], 1, 1), self.hadamard_out.unsqueeze(0).repeat(qinput.shape[0], 1, 1), self.hadamard_bs.unsqueeze(0).repeat(qinput.shape[0], 1, 1))
+
+      # out = FLinearQ.apply(qinput, w_q, self.hadamard_out, h_bs,)
       # import pdb; pdb.set_trace()
       # 
 
@@ -681,8 +687,8 @@ class Conv2d_Ours(nn.Conv2d):
       # output = FLinearQ.apply(qinput, w_q, self.quantizeBwd, self.uname, self.hadamard_out, h_bs,) + self.bias
 
       # LUQ bwd
-      output = GradStochasticClippingQ.apply(
-        output, self.quantizeBwd, self.layerIdx, self.repeatBwd, self.uname)
+      # output = GradStochasticClippingQ.apply(
+      #   output, self.quantizeBwd, self.layerIdx, self.repeatBwd, self.uname)
 
     else:
       output = F.linear(input, self.weight, self.bias)
