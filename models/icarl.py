@@ -17,25 +17,6 @@ from backbones.linears import SimpleLinear
 from datetime import datetime
 import quant
 
-EPSILON = 1e-8
-
-init_epoch = 170
-init_lr = 0.05
-init_milestones = [60, 100, 140]
-init_lr_decay = 0.1
-init_weight_decay = 2e-4  # 0.0005
-
-
-epochs = 170
-lrate = 0.1
-milestones = [60, 100, 140]
-lrate_decay = 0.1
-batch_size = 128
-weight_decay = 2e-4
-num_workers = 8
-T = 2
-
-
 track_layer_list = ['_convnet_conv_1_3x3', '_convnet_stage_1_2_conv_b',
                     '_convnet_stage_2_4_conv_a', '_convnet_stage_3_3_conv_a', '_fc']
 
