@@ -18,7 +18,7 @@ from backbones.linears import SimpleLinear
 
 from squant_function import SQuant_func
 
-from hadamard import hadamard, prime_factors, make_hadamard
+from hadamard import make_hadamard, biggest_power2_factor
 
 track_stats = {'grads': {}, 'acts': {}, 'wgts': {},
                'grad_stats': {}, 'test_acc': [], 'train_acc': [], 'loss': []}
@@ -287,7 +287,7 @@ class Linear_LUQ(nn.Linear):
 
   def forward(self, input):
 
-    if self.quantizeFwd:
+    if False: # self.quantizeFwd:
 
       w_q = UniformQuantizeSawb.apply(
           self.weight, self.c1, self.c2, self.QpW, self.QnW)
@@ -320,7 +320,7 @@ class Conv2d_LUQ(nn.Conv2d):
 
   def forward(self, input):
 
-    if self.quantizeFwd:
+    if False: # self.quantizeFwd:
       w_q = UniformQuantizeSawb.apply(
           self.weight, self.c1, self.c2, self.QpW, self.QnW)
 
@@ -405,6 +405,13 @@ class GradStochasticClippingQ(Function):
     return grad_input, None, None, None, None
 
 
+def dynamic_intQ(x):
+  mx = x.abs().max() * .975 # torch.quantile(x.abs(), .99)
+  scale = mx/(2**(quantBits-1)-1)
+  x = torch.clamp(x, -mx, mx)
+  return torch.round(x/scale) * scale
+
+
 class FLinearQ(torch.autograd.Function):
   generate_vmap_rule = True
 
@@ -425,19 +432,22 @@ class FLinearQ(torch.autograd.Function):
 
     # if quant:
 
-    w_h1 = h_out @ w
+    w_h1 = h_out @ w # TODO check if w_h1 is still 4 bits
     grad_output_h1 = grad_output @ h_out
 
     # quant grad_output
+    grad_output_h1 = dynamic_intQ(grad_output_h1)
 
-    grad_input = (grad_output_h1 @ w_h1) * 1 / prime_factors(h_out.shape[0])
+
+    grad_input = (grad_output_h1 @ w_h1) * 1 / biggest_power2_factor(h_out.shape[0])
 
     x_h2 = h_bs @ x
     grad_output_h2 = grad_output.T @ h_bs
 
     # quant grad_output
+    grad_output_h2 = dynamic_intQ(grad_output_h2)
 
-    grad_w = (grad_output_h2 @ x_h2) * 1 / prime_factors(h_bs.shape[0])
+    grad_w = (grad_output_h2 @ x_h2) * 1 / biggest_power2_factor(h_bs.shape[0])
 
     # np.testing.assert_allclose(grad_w.cpu(), (grad_output.T @ x).cpu())
     # np.testing.assert_allclose(grad_input.cpu(), (grad_output @ w).cpu() )
@@ -515,7 +525,6 @@ class Linear_Ours(nn.Linear):
 
       # TODO: optimize speed of hadamard creation
       if input.shape[0] != quantBatchSize:
-        # biggest_pow2 = prime_factors(input.shape[0])
         h_bs = torch.tensor(make_hadamard(
             input.shape[0]), dtype=self.weight.dtype).to(self.weight.device)
       else:
@@ -553,6 +562,7 @@ class Conv2d_Ours(nn.Conv2d):
   def forward(self, input):
 
     if self.quantizeFwd:
+      # TODO turn on quantized forward pass
       # w_q = UniformQuantizeSawb.apply(
       #       self.weight, self.c1, self.c2, self.QpW, self.QnW)
 
