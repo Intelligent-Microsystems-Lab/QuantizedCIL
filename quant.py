@@ -31,6 +31,7 @@ quantTrack = False
 quantBits = 4
 quantMethod = "luq"
 quantBatchSize = 128
+quantFWDWeight = 'sawb'
 
 quantGradMxScale = 1.
 
@@ -406,11 +407,43 @@ class GradStochasticClippingQ(Function):
 
 
 def dynamic_intQ(x):
-  mx = x.abs().max() * .975 # torch.quantile(x.abs(), .99)
+  mx = x.abs().max() * .975 # torch.quantile(x.abs(), .99) # TODO optimize calibration
   scale = mx/(2**(quantBits-1)-1)
   x = torch.clamp(x, -mx, mx)
   return torch.round(x/scale) * scale
 
+
+class dynamic_intQ_FWD(Function):
+
+  @staticmethod
+  def forward(ctx, x):
+    mx = x.abs().max() * .975 # torch.quantile(x.abs(), .99) # TODO optimize calibration
+    ctx.mx = mx
+    ctx.save_for_backward(x)
+    scale = mx/(2**(quantBits-1)-1)
+    x = torch.clamp(x, -mx, mx)
+    return torch.round(x/scale) * scale
+
+  @staticmethod
+  def backward(ctx, grad_output):
+    # STE
+    x, = ctx.saved_tensors
+    grad_output = torch.where(x>ctx.mx, torch.tensor([0], dtype=x.dtype, device=x.device), grad_output)
+    grad_output = torch.where(x<-ctx.mx, torch.tensor([0], dtype=x.dtype, device=x.device), grad_output)
+    return grad_output
+
+def SAWB(input, c1, c2, Qp, Qn):
+  output = input.clone()
+
+  clip = (c1 * torch.sqrt(torch.mean(input**2))) - \
+      (c2 * torch.mean(input.abs()))
+  scale = 2 * clip / (Qp - Qn)
+
+  output.div_(scale)
+  output.clamp_(Qn, Qp).round_()
+  output.mul_(scale)
+
+  return output
 
 class FLinearQ(torch.autograd.Function):
   generate_vmap_rule = True
@@ -433,6 +466,9 @@ class FLinearQ(torch.autograd.Function):
     # if quant:
 
     w_h1 = h_out @ w # TODO check if w_h1 is still 4 bits
+    # requantize weights
+    # w_h1 = SAWB(w_h1, 12.1, 12.2, 7, -7)
+    # w_h1 = dynamic_intQ(w_h1)
     grad_output_h1 = grad_output @ h_out
 
     # quant grad_output
@@ -507,10 +543,20 @@ class Linear_Ours(nn.Linear):
   def forward(self, input):
 
     if self.quantizeFwd:
+      # w_q = dynamic_intQ_FWD.apply(self.weight)
+
       # w_q = UniformQuantizeSawb.apply(
       #       self.weight, self.c1, self.c2, self.QpW, self.QnW)
 
-      # w_q = lsq(self.weight, self.lsq_wgt, self.QnW, self.QpW)
+      if quantFWDWeight == 'sawb':
+        w_q = UniformQuantizeSawb.apply(
+              self.weight, self.c1, self.c2, self.QpW, self.QnW)
+      elif quantFWDWeight == 'int':
+        w_q = dynamic_intQ_FWD.apply(self.weight)
+      elif quantFWDWeight == 'lsq':
+        w_q = lsq(self.weight, self.lsq_wgt, self.QnW, self.QpW)
+      else:
+        raise Exception('FWD weight quantized method not implemented: ' + quantFWDWeight)
 
       if torch.min(input) < 0:
         self.QnA = -2 ** (self.abits - 1) + 1
@@ -520,7 +566,7 @@ class Linear_Ours(nn.Linear):
       #       input, self.c1, self.c2, self.QpA, self.QnA)
       # qinput = lsq(input, self.lsq_act, self.QnA, self.QpA)
 
-      w_q = self.weight
+      # w_q = self.weight
       qinput = input
 
       # TODO: optimize speed of hadamard creation
@@ -563,10 +609,15 @@ class Conv2d_Ours(nn.Conv2d):
 
     if self.quantizeFwd:
       # TODO turn on quantized forward pass
-      # w_q = UniformQuantizeSawb.apply(
-      #       self.weight, self.c1, self.c2, self.QpW, self.QnW)
-
-      # w_q = lsq(self.weight, self.lsq_wgt, self.QnW, self.QpW)
+      if quantFWDWeight == 'sawb':
+        w_q = UniformQuantizeSawb.apply(
+              self.weight, self.c1, self.c2, self.QpW, self.QnW)
+      elif quantFWDWeight == 'int':
+        w_q = dynamic_intQ_FWD.apply(self.weight)
+      elif quantFWDWeight == 'lsq':
+        w_q = lsq(self.weight, self.lsq_wgt, self.QnW, self.QpW)
+      else:
+        raise Exception('FWD weight quantized method not implemented: ' + quantFWDWeight)
 
       # if torch.min(input) < 0:
       #   self.QnA = -2 ** (self.abits - 1) + 1
@@ -576,7 +627,7 @@ class Conv2d_Ours(nn.Conv2d):
       #       input, self.c1, self.c2, self.QpA, self.QnA)
       # qinput = lsq(input, self.lsq_act, self.QnA, self.QpA)
 
-      w_q = self.weight
+      # w_q = self.weight
       qinput = input
 
       # TODO: optimize speed of hadamard creation
@@ -595,7 +646,6 @@ class Conv2d_Ours(nn.Conv2d):
 
       # out = FLinearQ.apply(qinput, w_q, self.hadamard_out, h_bs,)
       # import pdb; pdb.set_trace()
-      # 
 
       out = out.transpose(1, 2)
       output = out.view((input.shape[0], self.out_channels, int(
