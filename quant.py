@@ -33,6 +33,11 @@ quantMethod = "luq"
 quantBatchSize = 128
 quantFWDWeight = 'sawb'
 
+QpW = None
+QnW = None
+QpA = None
+QnA = None
+
 quantGradMxScale = 1.
 
 scale_library = {'a': {}, 'w': {}, 'g': {}}
@@ -51,7 +56,16 @@ def init_properties(obj, uname):
   obj.QnW = -2 ** (obj.wbits - 1) + 1
   obj.QpW = 2 ** (obj.wbits - 1) - 1
   obj.QnA = 0
-  obj.QpA = 2 ** obj.abits - 1 
+  obj.QpA = 2 ** obj.abits - 1
+
+  global QpW
+  global QnW
+  global QpA
+  global QnA
+  QpW = obj.QpW
+  QnpW = obj.QnW
+  QpA = obj.QpA
+  QnA = obj.QnA
 
   obj.quantizeFwd = quantizeFwd
   obj.quantizeBwd = quantizeBwd
@@ -467,7 +481,7 @@ class FLinearQ(torch.autograd.Function):
 
     w_h1 = h_out @ w # TODO check if w_h1 is still 4 bits
     # requantize weights
-    # w_h1 = SAWB(w_h1, 12.1, 12.2, 7, -7)
+    w_h1 = SAWB(w_h1, 12.1, 12.2, QpW, QnW)
     # w_h1 = dynamic_intQ(w_h1)
     grad_output_h1 = grad_output @ h_out
 
