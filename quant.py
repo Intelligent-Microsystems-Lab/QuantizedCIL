@@ -510,7 +510,7 @@ def round_pass(x):
   return (y - y_grad).detach() + y_grad
 
 
-def lsq(x, s, Qn, Qp):
+def lsq(x, s, Qp, Qn):
   # https://github.com/zhutmost/lsq-net
   s_grad_scale = 1.0 / ((Qp * x.numel()) ** 0.5)
   s_scale = grad_scale(s, s_grad_scale)
@@ -554,7 +554,7 @@ class Linear_Ours(nn.Linear):
       elif quantFWDWeight == 'int':
         w_q = dynamic_intQ_FWD.apply(self.weight)
       elif quantFWDWeight == 'lsq':
-        w_q = lsq(self.weight, self.lsq_wgt, self.QnW, self.QpW)
+        w_q = lsq(self.weight, self.lsq_wgt, self.QpW, self.QnW)
       else:
         raise Exception('FWD weight quantized method not implemented: ' + quantFWDWeight)
 
@@ -615,7 +615,7 @@ class Conv2d_Ours(nn.Conv2d):
       elif quantFWDWeight == 'int':
         w_q = dynamic_intQ_FWD.apply(self.weight)
       elif quantFWDWeight == 'lsq':
-        w_q = lsq(self.weight, self.lsq_wgt, self.QnW, self.QpW)
+        w_q = lsq(self.weight, self.lsq_wgt, self.QpW, self.QnW)
       else:
         raise Exception('FWD weight quantized method not implemented: ' + quantFWDWeight)
 
