@@ -29,9 +29,10 @@ quantGradRound = "standard"
 quantCalibrate = "max"
 quantTrack = False
 quantBits = 4
-quantMethod = "luq"
+quantMethod = 'ours'
 quantBatchSize = 128
-quantFWDWeight = 'sawb'
+quantFWDWeight = 'int'
+quantFWDAct = 'int'
 
 QpW = None
 QnW = None
@@ -63,7 +64,7 @@ def init_properties(obj, uname):
   global QpA
   global QnA
   QpW = obj.QpW
-  QnpW = obj.QnW
+  QnW = obj.QnW
   QpA = obj.QpA
   QnA = obj.QnA
 
@@ -434,8 +435,13 @@ class dynamic_intQ_FWD(Function):
     mx = x.abs().max() * .975 # torch.quantile(x.abs(), .99) # TODO optimize calibration
     ctx.mx = mx
     ctx.save_for_backward(x)
-    scale = mx/(2**(quantBits-1)-1)
-    x = torch.clamp(x, -mx, mx)
+    if x.min() < 0:
+      scale = mx/(2**(quantBits-1)-1)
+      x = torch.clamp(x, -mx, mx)
+    else:
+      scale =  mx/(2**(quantBits)-1)
+      x = torch.clamp(x, 0, mx)
+    
     return torch.round(x/scale) * scale
 
   @staticmethod
@@ -481,7 +487,7 @@ class FLinearQ(torch.autograd.Function):
 
     w_h1 = h_out @ w # TODO check if w_h1 is still 4 bits
     # requantize weights
-    w_h1 = SAWB(w_h1, 12.1, 12.2, QpW, QnW)
+    w_h1 = dynamic_intQ(w_h1)
     # w_h1 = dynamic_intQ(w_h1)
     grad_output_h1 = grad_output @ h_out
 
@@ -492,6 +498,7 @@ class FLinearQ(torch.autograd.Function):
     grad_input = (grad_output_h1 @ w_h1) * 1 / biggest_power2_factor(h_out.shape[0])
 
     x_h2 = h_bs @ x
+    # TODO secdond act quant.
     grad_output_h2 = grad_output.T @ h_bs
 
     # quant grad_output
@@ -557,10 +564,6 @@ class Linear_Ours(nn.Linear):
   def forward(self, input):
 
     if self.quantizeFwd:
-      # w_q = dynamic_intQ_FWD.apply(self.weight)
-
-      # w_q = UniformQuantizeSawb.apply(
-      #       self.weight, self.c1, self.c2, self.QpW, self.QnW)
 
       if quantFWDWeight == 'sawb':
         w_q = UniformQuantizeSawb.apply(
@@ -572,16 +575,22 @@ class Linear_Ours(nn.Linear):
       else:
         raise Exception('FWD weight quantized method not implemented: ' + quantFWDWeight)
 
+
       if torch.min(input) < 0:
         self.QnA = -2 ** (self.abits - 1) + 1
         self.QpA = 2 ** (self.wbits - 1) - 1
 
-      # qinput = UniformQuantizeSawb.apply(
-      #       input, self.c1, self.c2, self.QpA, self.QnA)
-      # qinput = lsq(input, self.lsq_act, self.QnA, self.QpA)
-
-      # w_q = self.weight
-      qinput = input
+      if quantFWDAct == 'sawb':
+        qinput = UniformQuantizeSawb.apply(
+              input, self.c1, self.c2, self.QpA, self.QnA)
+      elif quantFWDAct == 'int':
+        qinput = dynamic_intQ_FWD.apply(input)
+      elif quantFWDAct == 'lsq':
+        qinput = lsq(input, self.lsq_wgt, self.QpA, self.QnA)
+      elif quantFWDAct == 'noq':
+        qinput = input
+      else:
+        raise Exception('FWD act quantized method not implemented: ' + quantFWDWeight)
 
       # TODO: optimize speed of hadamard creation
       if input.shape[0] != quantBatchSize:
@@ -591,10 +600,6 @@ class Linear_Ours(nn.Linear):
         h_bs = self.hadamard_bs
 
       output = FLinearQ.apply(qinput, w_q, self.hadamard_out, h_bs) + self.bias
-
-      # LUQ bwd
-      # output = GradStochasticClippingQ.apply(
-      #   output, self.quantizeBwd, self.layerIdx, self.repeatBwd, self.uname)
 
     else:
       output = F.linear(input, self.weight, self.bias)
@@ -622,7 +627,6 @@ class Conv2d_Ours(nn.Conv2d):
   def forward(self, input):
 
     if self.quantizeFwd:
-      # TODO turn on quantized forward pass
       if quantFWDWeight == 'sawb':
         w_q = UniformQuantizeSawb.apply(
               self.weight, self.c1, self.c2, self.QpW, self.QnW)
@@ -633,16 +637,21 @@ class Conv2d_Ours(nn.Conv2d):
       else:
         raise Exception('FWD weight quantized method not implemented: ' + quantFWDWeight)
 
-      # if torch.min(input) < 0:
-      #   self.QnA = -2 ** (self.abits - 1) + 1
-      #   self.QpA = 2 ** (self.wbits - 1) - 1
+      if torch.min(input) < 0:
+        self.QnA = -2 ** (self.abits - 1) + 1
+        self.QpA = 2 ** (self.wbits - 1) - 1
 
-      # qinput = UniformQuantizeSawb.apply(
-      #       input, self.c1, self.c2, self.QpA, self.QnA)
-      # qinput = lsq(input, self.lsq_act, self.QnA, self.QpA)
-
-      # w_q = self.weight
-      qinput = input
+      if quantFWDAct == 'sawb':
+        qinput = UniformQuantizeSawb.apply(
+              input, self.c1, self.c2, self.QpA, self.QnA)
+      elif quantFWDAct == 'int':
+        qinput = dynamic_intQ_FWD.apply(input)
+      elif quantFWDAct == 'lsq':
+        qinput = lsq(input, self.lsq_wgt, self.QpA, self.QnA)
+      elif quantFWDAct == 'noq':
+        qinput = input
+      else:
+        raise Exception('FWD act quantized method not implemented: ' + quantFWDWeight)
 
       # TODO: optimize speed of hadamard creation
 
@@ -658,20 +667,12 @@ class Conv2d_Ours(nn.Conv2d):
       out = flinearq_fn(qinput, w_q.T.unsqueeze(0).repeat(qinput.shape[0], 1, 1), self.hadamard_out.unsqueeze(
           0).repeat(qinput.shape[0], 1, 1), self.hadamard_bs.unsqueeze(0).repeat(qinput.shape[0], 1, 1))
 
-      # out = FLinearQ.apply(qinput, w_q, self.hadamard_out, h_bs,)
-      # import pdb; pdb.set_trace()
-
+      # reshaping outputs into image form with batch, channel, height, width
       out = out.transpose(1, 2)
       output = out.view((input.shape[0], self.out_channels, int(
           input.shape[-2] / self.stride[0]), int(input.shape[-1] / self.stride[1]))) + self.bias.view(1, -1, 1, 1)
 
       # np.testing.assert_allclose(output_cmp.cpu().detach().numpy(), output.cpu().detach().numpy(), rtol=1e-05, atol=1e-2)
-
-      # output = FLinearQ.apply(qinput, w_q, self.quantizeBwd, self.uname, self.hadamard_out, h_bs,) + self.bias
-
-      # LUQ bwd
-      # output = GradStochasticClippingQ.apply(
-      #   output, self.quantizeBwd, self.layerIdx, self.repeatBwd, self.uname)
 
     else:
       output = F.linear(input, self.weight, self.bias)

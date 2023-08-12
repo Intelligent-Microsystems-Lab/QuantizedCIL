@@ -103,7 +103,10 @@ def setup_parser():
                                                              'ours'])
   parser.add_argument('--quantFWDWeight', '-qfwdw', type=str,
                       default=None, required=False, choices=['sawb', "int",
-                                                             'lsq'])
+                                                             'lsq', 'noq'])
+  parser.add_argument('--quantFWDAct', '-qfwda', type=str,
+                      default=None, required=False, choices=['sawb', "int",
+                                                             'lsq', 'noq'])
   # training parameters
   parser.add_argument('--init_epoch', type=int, default=170)
   parser.add_argument('--init_lr', type=float, default=0.05)
