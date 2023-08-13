@@ -481,24 +481,23 @@ class FLinearQ(torch.autograd.Function):
   @staticmethod
   def backward(ctx, grad_output):
     x, w, h_out, h_bs = ctx.saved_tensors
-    # w = w.T
 
-    # if quant:
-
-    w_h1 = h_out @ w # TODO check if w_h1 is still 4 bits
+    w_h1 = h_out @ w
     # requantize weights
     w_h1 = dynamic_intQ(w_h1)
-    # w_h1 = dynamic_intQ(w_h1)
+
     grad_output_h1 = grad_output @ h_out
 
     # quant grad_output
     grad_output_h1 = dynamic_intQ(grad_output_h1)
 
-
+    # TODO biggest power of two can be optimized
     grad_input = (grad_output_h1 @ w_h1) * 1 / biggest_power2_factor(h_out.shape[0])
 
     x_h2 = h_bs @ x
-    # TODO secdond act quant.
+    # requantize acts
+    x_h2 = dynamic_intQ(x_h2)
+    
     grad_output_h2 = grad_output.T @ h_bs
 
     # quant grad_output
@@ -508,11 +507,6 @@ class FLinearQ(torch.autograd.Function):
 
     # np.testing.assert_allclose(grad_w.cpu(), (grad_output.T @ x).cpu())
     # np.testing.assert_allclose(grad_input.cpu(), (grad_output @ w).cpu() )
-
-    # else:
-    #   grad_input = grad_output @ w
-
-    #   grad_w = grad_output.T @ x
 
     return grad_input, grad_w, None, None, None, None
 
