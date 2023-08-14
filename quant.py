@@ -20,6 +20,7 @@ from squant_function import SQuant_func
 
 from hadamard import make_hadamard, biggest_power2_factor
 
+
 track_stats = {'grads': {}, 'acts': {}, 'wgts': {},
                'grad_stats': {}, 'test_acc': [], 'train_acc': [], 'loss': []}
 calibrate_phase = False
@@ -421,11 +422,11 @@ class GradStochasticClippingQ(Function):
     return grad_input, None, None, None, None
 
 
-def dynamic_intQ(x):
+def dynamic_intQ(x, scale = .975):
   mx = x.abs().max() * .975 # torch.quantile(x.abs(), .99) # TODO optimize calibration
   scale = mx/(2**(quantBits-1)-1)
   x = torch.clamp(x, -mx, mx)
-  return torch.round(x/scale) * scale
+  return torch.round(x/(scale + 1e-32)) * scale # epsilion for vmap # TODO eps size?
 
 
 class dynamic_intQ_FWD(Function):
@@ -470,7 +471,6 @@ class FLinearQ(torch.autograd.Function):
 
   @staticmethod
   def forward(x, w, h_out, h_bs):
-    # output = x @ w
     output = F.linear(x, w)
     return output
 
@@ -504,9 +504,6 @@ class FLinearQ(torch.autograd.Function):
     grad_output_h2 = dynamic_intQ(grad_output_h2)
 
     grad_w = (grad_output_h2 @ x_h2) * 1 / biggest_power2_factor(h_bs.shape[0])
-
-    # np.testing.assert_allclose(grad_w.cpu(), (grad_output.T @ x).cpu())
-    # np.testing.assert_allclose(grad_input.cpu(), (grad_output @ w).cpu() )
 
     return grad_input, grad_w, None, None, None, None
 

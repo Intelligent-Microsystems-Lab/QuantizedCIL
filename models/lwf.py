@@ -19,6 +19,7 @@ track_layer_list = ['_convnet_conv_1_3x3', '_convnet_stage_1_2_conv_b',
                     '_convnet_stage_2_4_conv_a', '_convnet_stage_3_3_conv_a', '_fc']
 grad_quant_bias = {}
 
+glob_counter = 0
 
 class LwF(BaseLearner):
   def __init__(self, args):
@@ -142,12 +143,6 @@ class LwF(BaseLearner):
         optimizer.zero_grad()
         loss.backward()
 
-        # # save all gradients
-        # unquantized_grad = {}
-        # for k, param in self._network.named_parameters():
-        #   if 'weight' in k:
-        #     if param.grad is not None:
-        #       unquantized_grad[k] = copy.deepcopy(param.grad)
 
         optimizer.step()
         losses += loss.item()
