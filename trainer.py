@@ -105,8 +105,12 @@ def _train(args):
   quant.quantTrack = args["quantizeTrack"]
   quant.quantBits = args["quantBits"]
   quant.quantMethod = args["quantMethod"]
-  quant.quantFWDWeight = args["quantFWDWeight"]
+  quant.quantFWDWgt = args["quantFWDWgt"]
   quant.quantFWDAct = args["quantFWDAct"]
+  quant.quantBWDWgt = args["quantBWDWgt"]
+  quant.quantBWDAct = args["quantBWDAct"]
+  quant.quantBWDGrad1 = args["quantBWDGrad1"]
+  quant.quantBWDGrad2 = args["quantBWDGrad2"]
 
   start_time = time.time()
   logging.info(f"Start time:{start_time}")

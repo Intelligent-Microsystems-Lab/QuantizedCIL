@@ -93,7 +93,7 @@ def setup_parser():
   parser.add_argument('--quantBits', type=int, default=4)
   parser.add_argument('--quantizeFwd', action="store_true")
   parser.add_argument('--quantizeBwd', action="store_true")
-  parser.add_argument('--quantGradRound', type=str, default="standard",
+  parser.add_argument('--quantGradRound1', type=str, default="standard",
                       required=False, choices=['stoch', 'sq', 'standard'])
   parser.add_argument('--quantCalibrate', type=str, default="max",
                       required=False, choices=['max'])
@@ -101,12 +101,20 @@ def setup_parser():
   parser.add_argument('--quantMethod', '-qmethod', type=str,
                       default=None, required=False, choices=['luq', "ibm",
                                                              'ours'])
-  parser.add_argument('--quantFWDWeight', '-qfwdw', type=str,
+  parser.add_argument('--quantFWDWgt', '-qfwdw', type=str,
                       default=None, required=False, choices=['sawb', "int",
                                                              'lsq', 'noq'])
   parser.add_argument('--quantFWDAct', '-qfwda', type=str,
                       default=None, required=False, choices=['sawb', "int",
                                                              'lsq', 'noq'])
+  parser.add_argument('--quantBWDWgt', '-qbwdw', type=str,
+                      default=None, required=False, choices=["int", 'noq'])
+  parser.add_argument('--quantBWDAct', '-qbwda', type=str,
+                      default=None, required=False, choices=["int", 'noq'])
+  parser.add_argument('--quantBWDGrad1', '-qbwdg1' , type=str, default="standard",
+                      required=False, choices=['stoch', 'sq', 'standard', 'noq'])
+  parser.add_argument('--quantBWDGrad2', '-qbwdg2' , type=str, default="standard",
+                      required=False, choices=['stoch', 'sq', 'standard', 'noq'])
   # training parameters
   parser.add_argument('--init_epoch', type=int, default=170)
   parser.add_argument('--init_lr', type=float, default=0.05)
