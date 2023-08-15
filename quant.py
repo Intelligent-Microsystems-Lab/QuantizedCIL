@@ -423,11 +423,69 @@ class GradStochasticClippingQ(Function):
 
 
 def dynamic_intQ(x, scale = .975):
+  # can only be used in BWD - not differentiable
   mx = x.abs().max() * .975 # torch.quantile(x.abs(), .99) # TODO optimize calibration
   scale = mx/(2**(quantBits-1)-1)
   x = torch.clamp(x, -mx, mx)
   return torch.round(x/(scale + 1e-32)) * scale # epsilion for vmap # TODO eps size?
 
+
+def dynamic_squant(x, scale = 1):
+  # can only be used in BWD - not differentiable
+  dim = x.shape
+  x = x.flatten()
+
+  mx = x.abs().max() * scale # torch.quantile(x.abs(), .99) # TODO optimize calibration
+  scale = mx/(2**(quantBits-1)-1)
+
+  x_clamp = torch.clamp(x, -mx, mx)/(scale + 1e-32)
+  xq = torch.round(x_clamp)
+
+  xq_down = xq - 1
+  xq_up = xq + 1
+
+  qe = xq - x_clamp
+
+  # bias meaning positive too much round up
+  bias = qe.sum()
+
+  topk = bias.abs().floor()
+
+  pos_val = torch.topk(qe, topk)
+  neg_val = torch.topk(-qe, topk)
+
+  xq_pos = xq.clone()
+  xq_pos[pos_val.indices] = xq_down[pos_val.indices]
+
+  xq_neg = xq.clone()
+  xq_neg[neg_val.indices] = xq_up[neg_val.indices]
+
+  xq = torch.where(bias > 0, xq_pos, xq_neg)
+
+  # assert torch.unique(xq).shape[0] < 9
+
+  xq = torch.reshape(xq, dim)
+  return xq * scale
+
+def dynamic_stoch(x, scale = 1):
+  dim = x.shape
+  x = x.flatten()
+
+  mx = x.abs().max() * scale # torch.quantile(x.abs(), .99) # TODO optimize calibration
+  scale = mx/(2**(quantBits-1)-1)
+  x = torch.clamp(x, -mx, mx)/(scale + 1e-32)
+
+  sign = torch.sign(x)
+  xq_ord = torch.floor(x.abs())
+
+  qe = x.abs() - xq_ord
+
+  flip = torch.bernoulli(qe)
+
+  xq = xq_ord + flip
+
+  xq = torch.reshape(sign * xq, dim)
+  return xq * scale
 
 class dynamic_intQ_FWD(Function):
 
@@ -487,9 +545,15 @@ class FLinearQ(torch.autograd.Function):
     w_h1 = dynamic_intQ(w_h1)
 
     grad_output_h1 = grad_output @ h_out
-
     # quant grad_output
-    grad_output_h1 = dynamic_intQ(grad_output_h1)
+    if quantGradRound == 'standard':
+      grad_output_h1 = dynamic_intQ(grad_output_h1)
+    elif quantGradRound == 'sq':
+      grad_output_h1 = dynamic_squant(grad_output_h1)
+    elif quantGradRound == 'stoch':
+      grad_output_h1 = dynamic_stoch(grad_output_h1)
+    else:
+      raise Exception('Grad rounding scheme not implemented: ' + quantGradRound)
 
     # TODO biggest power of two can be optimized
     grad_input = (grad_output_h1 @ w_h1) * 1 / biggest_power2_factor(h_out.shape[0])
@@ -499,9 +563,15 @@ class FLinearQ(torch.autograd.Function):
     x_h2 = dynamic_intQ(x_h2)
     
     grad_output_h2 = grad_output.T @ h_bs
-
     # quant grad_output
-    grad_output_h2 = dynamic_intQ(grad_output_h2)
+    if quantGradRound == 'standard':
+      grad_output_h2 = dynamic_intQ(grad_output_h2)
+    elif quantGradRound == 'sq':
+      grad_output_h2 = dynamic_squant(grad_output_h2)
+    elif quantGradRound == 'stoch':
+      grad_output_h2 = dynamic_stoch(grad_output_h2)
+    else:
+      raise Exception('Grad rounding scheme not implemented: ' + quantGradRound)
 
     grad_w = (grad_output_h2 @ x_h2) * 1 / biggest_power2_factor(h_bs.shape[0])
 
@@ -654,7 +724,7 @@ class Conv2d_Ours(nn.Conv2d):
         self.hadamard_bs = torch.tensor(make_hadamard(
             qinput.shape[1]), dtype=self.weight.dtype).to(self.weight.device)
 
-      flinearq_fn = torch.vmap(FLinearQ.apply)
+      flinearq_fn = torch.vmap(FLinearQ.apply, randomness = 'different')
       out = flinearq_fn(qinput, w_q.T.unsqueeze(0).repeat(qinput.shape[0], 1, 1), self.hadamard_out.unsqueeze(
           0).repeat(qinput.shape[0], 1, 1), self.hadamard_bs.unsqueeze(0).repeat(qinput.shape[0], 1, 1))
 

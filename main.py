@@ -53,9 +53,9 @@ def eval_args(args):
     if args.quantCalibrate:
       update_message("ours", "quantCalibrate", "max")
       args.quantCalibrate = "max"
-    if args.quantGradRound != "standard":
-      update_message("ours", "quantGradRound", "standard")
-      args.quantGradRound = "standard" 
+    # if args.quantGradRound != "standard":
+    #   update_message("ours", "quantGradRound", "standard")
+    #   args.quantGradRound = "standard" 
     if args.quantizeTrack:
       update_message("ours", "quantizeTrack", False)
       args.quantizeTrack = False
