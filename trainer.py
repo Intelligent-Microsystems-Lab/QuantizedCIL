@@ -100,7 +100,6 @@ def _train(args):
   # quant overhead
   quant.quantizeFwd = args["quantizeFwd"]
   quant.quantizeBwd = args["quantizeBwd"]
-  quant.quantGradRound = args["quantGradRound"]
   quant.quantCalibrate = args["quantCalibrate"]
   quant.quantTrack = args["quantizeTrack"]
   quant.quantBits = args["quantBits"]

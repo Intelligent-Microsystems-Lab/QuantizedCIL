@@ -93,8 +93,6 @@ def setup_parser():
   parser.add_argument('--quantBits', type=int, default=4)
   parser.add_argument('--quantizeFwd', action="store_true")
   parser.add_argument('--quantizeBwd', action="store_true")
-  parser.add_argument('--quantGradRound1', type=str, default="standard",
-                      required=False, choices=['stoch', 'sq', 'standard'])
   parser.add_argument('--quantCalibrate', type=str, default="max",
                       required=False, choices=['max'])
   parser.add_argument('--quantizeTrack', action="store_true")
@@ -111,10 +109,10 @@ def setup_parser():
                       default=None, required=False, choices=["int", 'noq'])
   parser.add_argument('--quantBWDAct', '-qbwda', type=str,
                       default=None, required=False, choices=["int", 'noq'])
-  parser.add_argument('--quantBWDGrad1', '-qbwdg1' , type=str, default="standard",
-                      required=False, choices=['stoch', 'sq', 'standard', 'noq'])
-  parser.add_argument('--quantBWDGrad2', '-qbwdg2' , type=str, default="standard",
-                      required=False, choices=['stoch', 'sq', 'standard', 'noq'])
+  parser.add_argument('--quantBWDGrad1', '-qbwdg1' , type=str, default="int",
+                      required=False, choices=['stoch', 'sq', 'int', 'noq'])
+  parser.add_argument('--quantBWDGrad2', '-qbwdg2' , type=str, default="int",
+                      required=False, choices=['stoch', 'sq', 'int', 'noq'])
   # training parameters
   parser.add_argument('--init_epoch', type=int, default=170)
   parser.add_argument('--init_lr', type=float, default=0.05)
