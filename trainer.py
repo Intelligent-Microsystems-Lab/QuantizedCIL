@@ -98,8 +98,6 @@ def _train(args):
                                   "top5": []}, {"top1": [], "top5": []}, True
 
   # quant overhead
-  quant.quantizeFwd = args["quantizeFwd"]
-  quant.quantizeBwd = args["quantizeBwd"]
   quant.quantCalibrate = args["quantCalibrate"]
   quant.quantTrack = args["quantizeTrack"]
   quant.quantBits = args["quantBits"]

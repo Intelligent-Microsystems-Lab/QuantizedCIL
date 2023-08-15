@@ -91,8 +91,6 @@ def setup_parser():
   parser.add_argument('--skip', action="store_true",)
   parser.add_argument('--seed', '-seed', nargs='+', type=int, default=[1994],)
   parser.add_argument('--quantBits', type=int, default=4)
-  parser.add_argument('--quantizeFwd', action="store_true")
-  parser.add_argument('--quantizeBwd', action="store_true")
   parser.add_argument('--quantCalibrate', type=str, default="max",
                       required=False, choices=['max'])
   parser.add_argument('--quantizeTrack', action="store_true")
