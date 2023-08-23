@@ -7,6 +7,7 @@ from scipy import io
 import random
 from utils import utils
 
+
 def get_hapt(remove_bad=True):
   class_name_translator = {1: "walking", 2: "walking upstairs",
                            3: "walking downstairs", 4: "sitting",

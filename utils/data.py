@@ -1,6 +1,7 @@
 import numpy as np
 from torchvision import datasets, transforms
 from utils.toolkit import split_images_labels
+import har_data
 
 class iData(object):
   train_trsf = []
@@ -133,7 +134,7 @@ class iDSADS(iData):
   class_order = np.arange(19).tolist()
 
   def org_data(self):
-    train_df, test_df, _, _, _, label_pos, _ = get_data("dsads", 0.2,
+    train_df, test_df, _, _, _, label_pos, _ = har_data.get_data("dsads", 0.2,
                                                         delete_class_column=False,
                                                         user_test_set_size=0)
     features, labels, _ = get_features_labels_users_from_df(train_df,
@@ -150,7 +151,7 @@ class iPAMAP(iData):
   class_order = np.arange(11).tolist()
 
   def org_data(self):
-    train_df, test_df, _, _, _, label_pos, _ = get_data("pamap", 0.2,
+    train_df, test_df, _, _, _, label_pos, _ = har_data.get_data("pamap", 0.2,
                                                         delete_class_column=False,
                                                         user_test_set_size=0)
     features, labels, _ = get_features_labels_users_from_df(train_df,
@@ -167,7 +168,7 @@ class iHAPT(iData):
   class_order = np.arange(11).tolist()
 
   def org_data(self):
-    train_df, test_df, _, _, _, label_pos, _ = get_data("hapt", 0.2,
+    train_df, test_df, _, _, _, label_pos, _ = har_data.get_data("hapt", 0.2,
                                                         delete_class_column=False,
                                                         user_test_set_size=0)
     features, labels, _ = get_features_labels_users_from_df(train_df,
@@ -184,7 +185,7 @@ class iWISDM(iData):
   class_order = np.arange(18).tolist()
 
   def org_data(self):
-    train_df, test_df, _, _, _, label_pos, _ = get_data("wisdm", 0.2,
+    train_df, test_df, _, _, _, label_pos, _ = har_data.get_data("wisdm", 0.2,
                                                         delete_class_column=False,
                                                         user_test_set_size=0)
     features, labels, _ = get_features_labels_users_from_df(train_df,
