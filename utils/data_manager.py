@@ -140,7 +140,7 @@ class DataManager(object):
     idata = _get_idata(dataset_name)
     try:
       idata.download_data()
-    catch:
+    except:
       idata.org_data()
 
     # Data
