@@ -6,7 +6,6 @@ import pandas as pd
 from scipy import io
 import random
 from utils import utils
-from utils.data import iData
 
 def get_hapt(remove_bad=True):
   class_name_translator = {1: "walking", 2: "walking upstairs",
@@ -125,7 +124,7 @@ def get_data(d_name, TEST_SIZE, delete_class_column=False, user_test_set_size=0)
   elif d_name.lower() == "hapt":
       df, person_column, label_pos, class_name_translator = get_hapt()
   else:
-      # throw error 
+      raise ValueError(f"Dataset {d_name} not found.")
     
   
   df[person_column] = df[person_column].astype("int")
@@ -242,74 +241,3 @@ def get_features_labels_users_from_df(df, label_col, user_col):
   user_data = df[user_col].values
   features = df.drop(columns=[label_col, user_col]).values
   return features, label_data, user_data
-
-
-
-
-class iDSADS(iData):
-  use_path = False
-  class_order = np.arange(19).tolist()
-
-  def org_data(self):
-    train_df, test_df, _, _, _, label_pos, _ = get_data("dsads", 0.2,
-                                                        delete_class_column=False,
-                                                        user_test_set_size=0)
-    features, labels, _ = get_features_labels_users_from_df(train_df,
-                                                            label_pos,
-                                                            "USER")
-    test_features, test_labels, _ = get_features_labels_users_from_df(test_df,
-                                                                      label_pos,
-                                                                      "USER")
-    self.train_data, self.train_targets = features, labels
-    self.test_data, self.test_targets = test_features, test_labels
-
-class iPAMAP(iData):
-  use_path = False
-  class_order = np.arange(11).tolist()
-
-  def org_data(self):
-    train_df, test_df, _, _, _, label_pos, _ = get_data("pamap", 0.2,
-                                                        delete_class_column=False,
-                                                        user_test_set_size=0)
-    features, labels, _ = get_features_labels_users_from_df(train_df,
-                                                            label_pos,
-                                                            "USER")
-    test_features, test_labels, _ = get_features_labels_users_from_df(test_df,
-                                                                      label_pos,
-                                                                      "USER")
-    self.train_data, self.train_targets = features, labels
-    self.test_data, self.test_targets = test_features, test_labels
-
-class iHAPT(iData):
-  use_path = False
-  class_order = np.arange(11).tolist()
-
-  def org_data(self):
-    train_df, test_df, _, _, _, label_pos, _ = get_data("hapt", 0.2,
-                                                        delete_class_column=False,
-                                                        user_test_set_size=0)
-    features, labels, _ = get_features_labels_users_from_df(train_df,
-                                                            label_pos,
-                                                            "USER")
-    test_features, test_labels, _ = get_features_labels_users_from_df(test_df,
-                                                                      label_pos,
-                                                                      "USER")
-    self.train_data, self.train_targets = features, labels
-    self.test_data, self.test_targets = test_features, test_labels
-
-class iWISDM(iData):
-  use_path = False
-  class_order = np.arange(18).tolist()
-
-  def org_data(self):
-    train_df, test_df, _, _, _, label_pos, _ = get_data("wisdm", 0.2,
-                                                        delete_class_column=False,
-                                                        user_test_set_size=0)
-    features, labels, _ = get_features_labels_users_from_df(train_df,
-                                                            label_pos,
-                                                            "USER")
-    test_features, test_labels, _ = get_features_labels_users_from_df(test_df,
-                                                                      label_pos,
-                                                                       "USER")
-    self.train_data, self.train_targets = features, labels
-    self.test_data, self.test_targets = test_features, test_labels

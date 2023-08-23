@@ -3,8 +3,8 @@ import numpy as np
 from PIL import Image
 from torch.utils.data import Dataset
 from torchvision import transforms
-from utils.data import iCIFAR10, iCIFAR100, iImageNet100, iImageNet1000
-from utils.har_data import iDSADS, iPAMAP, iHAPT, iWISDM
+from utils.data import iCIFAR10, iCIFAR100, iImageNet100, iImageNet1000, iDSADS, iPAMAP, iHAPT, iWISDM
+
 
 
 class DataManager(object):

@@ -1,7 +1,6 @@
 import numpy as np
 from torchvision import datasets, transforms
 from utils.toolkit import split_images_labels
-import har_data
 
 class iData(object):
   train_trsf = []
@@ -127,3 +126,72 @@ class iImageNet100(iData):
 
     self.train_data, self.train_targets = split_images_labels(train_dset.imgs)
     self.test_data, self.test_targets = split_images_labels(test_dset.imgs)
+
+
+class iDSADS(iData):
+  use_path = False
+  class_order = np.arange(19).tolist()
+
+  def org_data(self):
+    train_df, test_df, _, _, _, label_pos, _ = get_data("dsads", 0.2,
+                                                        delete_class_column=False,
+                                                        user_test_set_size=0)
+    features, labels, _ = get_features_labels_users_from_df(train_df,
+                                                            label_pos,
+                                                            "USER")
+    test_features, test_labels, _ = get_features_labels_users_from_df(test_df,
+                                                                      label_pos,
+                                                                      "USER")
+    self.train_data, self.train_targets = features, labels
+    self.test_data, self.test_targets = test_features, test_labels
+
+class iPAMAP(iData):
+  use_path = False
+  class_order = np.arange(11).tolist()
+
+  def org_data(self):
+    train_df, test_df, _, _, _, label_pos, _ = get_data("pamap", 0.2,
+                                                        delete_class_column=False,
+                                                        user_test_set_size=0)
+    features, labels, _ = get_features_labels_users_from_df(train_df,
+                                                            label_pos,
+                                                            "USER")
+    test_features, test_labels, _ = get_features_labels_users_from_df(test_df,
+                                                                      label_pos,
+                                                                      "USER")
+    self.train_data, self.train_targets = features, labels
+    self.test_data, self.test_targets = test_features, test_labels
+
+class iHAPT(iData):
+  use_path = False
+  class_order = np.arange(11).tolist()
+
+  def org_data(self):
+    train_df, test_df, _, _, _, label_pos, _ = get_data("hapt", 0.2,
+                                                        delete_class_column=False,
+                                                        user_test_set_size=0)
+    features, labels, _ = get_features_labels_users_from_df(train_df,
+                                                            label_pos,
+                                                            "USER")
+    test_features, test_labels, _ = get_features_labels_users_from_df(test_df,
+                                                                      label_pos,
+                                                                      "USER")
+    self.train_data, self.train_targets = features, labels
+    self.test_data, self.test_targets = test_features, test_labels
+
+class iWISDM(iData):
+  use_path = False
+  class_order = np.arange(18).tolist()
+
+  def org_data(self):
+    train_df, test_df, _, _, _, label_pos, _ = get_data("wisdm", 0.2,
+                                                        delete_class_column=False,
+                                                        user_test_set_size=0)
+    features, labels, _ = get_features_labels_users_from_df(train_df,
+                                                            label_pos,
+                                                            "USER")
+    test_features, test_labels, _ = get_features_labels_users_from_df(test_df,
+                                                                      label_pos,
+                                                                       "USER")
+    self.train_data, self.train_targets = features, labels
+    self.test_data, self.test_targets = test_features, test_labels
