@@ -137,10 +137,10 @@ class iDSADS(iData):
     train_df, test_df, _, _, _, label_pos, _ = har_data.get_data("dsads", 0.2,
                                                         delete_class_column=False,
                                                         user_test_set_size=0)
-    features, labels, _ = get_features_labels_users_from_df(train_df,
+    features, labels, _ = har_data.get_features_labels_users_from_df(train_df,
                                                             label_pos,
                                                             "USER")
-    test_features, test_labels, _ = get_features_labels_users_from_df(test_df,
+    test_features, test_labels, _ = har_data.get_features_labels_users_from_df(test_df,
                                                                       label_pos,
                                                                       "USER")
     self.train_data, self.train_targets = features, labels
@@ -154,10 +154,10 @@ class iPAMAP(iData):
     train_df, test_df, _, _, _, label_pos, _ = har_data.get_data("pamap", 0.2,
                                                         delete_class_column=False,
                                                         user_test_set_size=0)
-    features, labels, _ = get_features_labels_users_from_df(train_df,
+    features, labels, _ = har_data.get_features_labels_users_from_df(train_df,
                                                             label_pos,
                                                             "USER")
-    test_features, test_labels, _ = get_features_labels_users_from_df(test_df,
+    test_features, test_labels, _ = har_data.get_features_labels_users_from_df(test_df,
                                                                       label_pos,
                                                                       "USER")
     self.train_data, self.train_targets = features, labels
@@ -171,10 +171,10 @@ class iHAPT(iData):
     train_df, test_df, _, _, _, label_pos, _ = har_data.get_data("hapt", 0.2,
                                                         delete_class_column=False,
                                                         user_test_set_size=0)
-    features, labels, _ = get_features_labels_users_from_df(train_df,
+    features, labels, _ = har_data.get_features_labels_users_from_df(train_df,
                                                             label_pos,
                                                             "USER")
-    test_features, test_labels, _ = get_features_labels_users_from_df(test_df,
+    test_features, test_labels, _ = har_data.get_features_labels_users_from_df(test_df,
                                                                       label_pos,
                                                                       "USER")
     self.train_data, self.train_targets = features, labels
@@ -188,10 +188,10 @@ class iWISDM(iData):
     train_df, test_df, _, _, _, label_pos, _ = har_data.get_data("wisdm", 0.2,
                                                         delete_class_column=False,
                                                         user_test_set_size=0)
-    features, labels, _ = get_features_labels_users_from_df(train_df,
+    features, labels, _ = har_data.get_features_labels_users_from_df(train_df,
                                                             label_pos,
                                                             "USER")
-    test_features, test_labels, _ = get_features_labels_users_from_df(test_df,
+    test_features, test_labels, _ = har_data.get_features_labels_users_from_df(test_df,
                                                                       label_pos,
                                                                        "USER")
     self.train_data, self.train_targets = features, labels
