@@ -4,6 +4,7 @@ from PIL import Image
 from torch.utils.data import Dataset
 from torchvision import transforms
 from utils.data import iCIFAR10, iCIFAR100, iImageNet100, iImageNet1000
+from utils.har_data import iDSADS, iPAMAP, iHAPT, iWISDM
 
 
 class DataManager(object):
@@ -189,24 +190,28 @@ class DataManager(object):
 
 
 class DummyDataset(Dataset):
-  def __init__(self, images, labels, trsf, use_path=False):
-    assert len(images) == len(labels), "Data size error!"
-    self.images = images
+  def __init__(self, data, labels, trsf, use_path=False, datatype="image"):
+    assert len(data) == len(labels), "Data size error!"
+    self.data = data
     self.labels = labels
     self.trsf = trsf
     self.use_path = use_path
+    self.datatype = datatype
 
   def __len__(self):
-    return len(self.images)
+    return len(self.data)
 
   def __getitem__(self, idx):
-    if self.use_path:
-      image = self.trsf(pil_loader(self.images[idx]))
+    if self.datatype == "image":
+      if self.use_path:
+        data = self.trsf(pil_loader(self.data[idx]))
+      else:
+        data = self.trsf(Image.fromarray(self.data[idx]))
     else:
-      image = self.trsf(Image.fromarray(self.images[idx]))
+      data = self.trsf(self.data[idx])
     label = self.labels[idx]
 
-    return idx, image, label
+    return idx, data, label
 
 
 def _map_new_class_index(y, order):
@@ -223,6 +228,14 @@ def _get_idata(dataset_name):
     return iImageNet1000()
   elif name == "imagenet100":
     return iImageNet100()
+  elif name == "dsads":
+    return iDSADS()
+  elif name == "pamap":
+    return iPAMAP()
+  elif name == "hapt":
+    return iHAPT()
+  elif name == "wisdm":
+    return iWISDM()
   else:
     raise NotImplementedError("Unknown dataset {}.".format(dataset_name))
 
