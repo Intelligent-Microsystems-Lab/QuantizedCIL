@@ -138,7 +138,10 @@ class DataManager(object):
 
   def _setup_data(self, dataset_name, shuffle, seed):
     idata = _get_idata(dataset_name)
-    idata.download_data()
+    try:
+      idata.download_data()
+    catch:
+      idata.org_data()
 
     # Data
     self._train_data, self._train_targets = idata.train_data, idata.train_targets

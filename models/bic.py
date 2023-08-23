@@ -22,7 +22,7 @@ class BiC(BaseLearner):
   def __init__(self, args):
     super().__init__(args)
     self._network = IncrementalNetWithBias(
-        args["convnet_type"], False, bias_correction=True
+        args["model_type"], False, bias_correction=True
     )
     self._class_means = None
     self.date_str = datetime.now().strftime('%y_%m_%d_%H_%M')

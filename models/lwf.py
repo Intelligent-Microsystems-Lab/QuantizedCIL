@@ -24,7 +24,7 @@ glob_counter = 0
 class LwF(BaseLearner):
   def __init__(self, args):
     super().__init__(args)
-    self._network = IncrementalNet(args["convnet_type"], False)
+    self._network = IncrementalNet(args["model_type"], False)
     self.date_str = datetime.now().strftime('%y_%m_%d_%H_%M')
 
   def after_task(self):
