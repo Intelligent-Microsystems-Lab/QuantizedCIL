@@ -1,4 +1,5 @@
 import random
+import math
 
 def random_split_list(a_list, split_perc):
     lista = random.sample(a_list, int(math.ceil(len(a_list) * (1 - split_perc))))
