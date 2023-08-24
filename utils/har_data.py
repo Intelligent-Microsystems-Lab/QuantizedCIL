@@ -72,6 +72,7 @@ def get_dsads():
   df = pd.read_csv("../Data/DSADS/generated/dsads.csv", header=None)
   # From data descriptions: Column 405 is the activity sequence indicating
   # the executing of activities (usually not used in experiments).
+  
   df = utils.delete_pd_column(df, 405)
   df.rename(columns = {406:405}, inplace = True)
   df.rename(columns = {407:406}, inplace = True)
@@ -171,6 +172,7 @@ def get_data(d_name, TEST_SIZE, delete_class_column=False, user_test_set_size=0)
       if user_test_set_size:
           user_test_df = utils.delete_pd_column(user_test_df, "USER")
   print(train_df.head(2))
+  label_pos = "LBL"
   return train_df, test_df, user_test_df, train_persons, test_persons, label_pos, class_name_translator
 
 
@@ -237,8 +239,14 @@ def transform_har_df_to_continual_dataset(df, test_df, label_col, user_col, args
   return dataset, user_test_df
 
 
+def start_labels_at_zero(labels):
+  labels = np.array(labels)
+  labels -= np.min(labels)
+  return labels
+
 def get_features_labels_users_from_df(df, label_col, user_col):
   label_data = df[label_col].values
+  label_data = start_labels_at_zero(label_data)
   user_data = df[user_col].values
   features = df.drop(columns=[label_col, user_col]).values
   return features, label_data, user_data
