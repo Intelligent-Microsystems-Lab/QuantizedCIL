@@ -29,12 +29,15 @@ class FCNet(nn.Module):
 
   def make_layers(self, in_dim, hid_dim, out_dim, nr_hid_layers, act_fun="relu"): 
     layers = []
-    layers.append(nn.Linear(in_dim, hid_dim))
-    layers.append(get_activation(act_fun))
-    for _ in range(nr_hid_layers):
-      layers.append(nn.Linear(hid_dim, hid_dim))
+    for _ in range(nr_hid_layers+1):
+      layer = nn.Linear(in_dim, hid_dim)
+      setattr(self, "fc{}".format(_), layer)
+      layers.append(nn.Linear(in_dim, hid_dim))
       layers.append(get_activation(act_fun))
-    layers.append(nn.Linear(hid_dim, out_dim))
+    layer = nn.Linear(in_dim, out_dim)
+    setattr(self, "fc{}".format(_+1), layer)
+    layers.append(layer)
+    layers.append(get_activation(act_fun))
     return nn.Sequential(*layers)
 
   @property
