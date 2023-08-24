@@ -81,10 +81,16 @@ class BaseLearner(object):
     grouped = accuracy(y_pred.T[0], y_true, self._known_classes)
     ret["grouped"] = grouped
     ret["top1"] = grouped["total"]
-    ret["top{}".format(self.topk)] = np.around(
-        (y_pred.T == np.tile(y_true, (self.topk, 1))).sum() * 100 / len(y_true),
-        decimals=2,
-    )
+    try:
+      ret["top{}".format(self.topk)] = np.around(
+          (y_pred.T == np.tile(y_true, (self.topk, 1))).sum() * 100 / len(y_true),
+          decimals=2,
+      )
+    except:
+      ret["top{}".format(self.topk)] = np.around(
+          (y_pred.T == np.tile(y_true, (self.args["init_cls"], 1))).sum() * 100 / len(y_true),
+          decimals=2,
+      )
 
     return ret
 
@@ -151,11 +157,18 @@ class BaseLearner(object):
       inputs = inputs.to(self._device)
       with torch.no_grad():
         outputs = self._network(inputs)["logits"]
-      predicts = torch.topk(
-          outputs, k=self.topk, dim=1, largest=True, sorted=True
-      )[
-          1
-      ]  # [bs, topk]
+      try:
+        predicts = torch.topk(
+            outputs, k=self.topk, dim=1, largest=True, sorted=True
+        )[
+            1
+        ]  # [bs, topk]
+      except:
+        predicts = torch.topk(
+            outputs, k=self.args["init_cls"], dim=1, largest=True, sorted=True
+        )[
+            1
+        ]  # [bs, topk]
       y_pred.append(predicts.cpu().numpy())
       y_true.append(targets.cpu().numpy())
 
@@ -170,7 +183,10 @@ class BaseLearner(object):
     # [N, nb_classes], choose the one with the smallest distance
     scores = dists.T
 
-    return np.argsort(scores, axis=1)[:, : self.topk], y_true  # [N, topk]
+    try:
+      return np.argsort(scores, axis=1)[:, : self.topk], y_true  # [N, topk]
+    except:
+      return np.argsort(scores, axis=1)[:, : self.args["init_cls"]], y_true  # [N, topk]
 
   def _extract_vectors(self, loader):
     self._network.eval()
