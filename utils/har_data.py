@@ -16,7 +16,7 @@ def get_hapt(remove_bad=True):
                            10: "lie to sit", 11: "stand to lie",
                            12: "lie to stand"}
   df = pd.read_csv("../Data/hapt_data/hapt_combined.csv")
-  label_pos = "LBL"
+  label_pos = "AID"
   person_column = "USER"
   if remove_bad:
       # remove class 8 because multiple users dont have it
@@ -244,8 +244,17 @@ def start_labels_at_zero(labels):
   labels -= np.min(labels)
   return labels
 
+def make_lbls_continous(labels):
+    labels = np.array(labels)
+    nr_lbls = len(np.unique(labels))
+    lbls = np.arange(nr_lbls)
+    lbl_dict = dict(zip(np.unique(labels), lbls))
+    labels = np.array([lbl_dict[lbl] for lbl in labels])
+    return labels
+
 def get_features_labels_users_from_df(df, label_col, user_col):
   label_data = df[label_col].values
+  label_data =make_lbls_continous(label_data)
   label_data = start_labels_at_zero(label_data)
   user_data = df[user_col].values
   features = df.drop(columns=[label_col, user_col]).values.astype(np.float32)

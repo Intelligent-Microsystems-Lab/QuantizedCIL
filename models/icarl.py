@@ -136,10 +136,7 @@ class iCaRL(BaseLearner):
                 self._cur_task) + lname + '_' + stat_name + '.npy', torch.hstack(quant.track_stats['grad_stats'][lname][stat_name]).numpy())
 
   def _init_train(self, train_loader, test_loader, optimizer, scheduler):
-    
-    for name, param in self._network.state_dict().items():
-      print(f"{name} has datatype {param.dtype}")
-    
+        
     prog_bar = tqdm(range(self.args['init_epoch']))
     for _, epoch in enumerate(prog_bar):
       self._network.train()
