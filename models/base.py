@@ -88,10 +88,9 @@ class BaseLearner(object):
       )
     except:
       ret["top{}".format(self.topk)] = np.around(
-          (y_pred.T == np.tile(y_true, (self.args["init_cls"], 1))).sum() * 100 / len(y_true),
+          (y_pred.T == np.tile(y_true, (y_pred.T.shape[0], 1))).sum() * 100 / len(y_true),
           decimals=2,
       )
-
     return ret
 
   def eval_task(self, save_conf=False):
@@ -165,7 +164,7 @@ class BaseLearner(object):
         ]  # [bs, topk]
       except:
         predicts = torch.topk(
-            outputs, k=self.args["init_cls"], dim=1, largest=True, sorted=True
+            outputs, k=outputs.shape[1]-1, dim=1, largest=True, sorted=True
         )[
             1
         ]  # [bs, topk]
@@ -182,11 +181,10 @@ class BaseLearner(object):
     dists = cdist(class_means, vectors, "sqeuclidean")  # [nb_classes, N]
     # [N, nb_classes], choose the one with the smallest distance
     scores = dists.T
-
     try:
       return np.argsort(scores, axis=1)[:, : self.topk], y_true  # [N, topk]
     except:
-      return np.argsort(scores, axis=1)[:, : self.args["init_cls"]], y_true  # [N, topk]
+      return np.argsort(scores, axis=1)[:, : scores.shape[1]-1], y_true  # [N, topk]
 
   def _extract_vectors(self, loader):
     self._network.eval()
