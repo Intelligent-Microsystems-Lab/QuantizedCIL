@@ -165,9 +165,9 @@ def place_quant(m, lin_w, lin_b, c_path='',):
                                       out_features=target_attr.out_features,
                                       bias=hasattr(target_attr, 'bias'),
                                       uname=c_path + '_' + attr_str,))
-        if lin_w is not None:
+        if lin_w is not None and attr_str == 'fc':
           m.fc.weight = nn.Parameter(lin_w)
-        if lin_b is not None:
+        if lin_b is not None and attr_str == 'fc':
           m.fc.bias = nn.Parameter(lin_b)
   for n, ch in m.named_children():
     place_quant(ch, lin_w, lin_b, c_path + '_' + n,)

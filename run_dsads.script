@@ -1,0 +1,12 @@
+#!/bin/bash
+#$ -M cschaef6@nd.edu 
+#$ -m abe
+#$ -q gpu@@joshi
+#$ -l gpu_card=1
+
+module load python
+export LD_LIBRARY_PATH=/afs/crc.nd.edu/user/c/cschaef6/.local/lib/cuda-12.1/lib64/:$LD_LIBRARY_PATH
+export LD_LIBRARY_PATH=/afs/crc.nd.edu/user/c/cschaef6/.local/lib/cudnn-linux-x86_64-8.8.1.3_cuda11-archive/lib:$LD_LIBRARY_PATH
+export LD_LIBRARY_PATH=/afs/crc.nd.edu/user/c/cschaef6/.local/lib/nccl_2.17.1-1+cuda11.0_x86_64/lib:$LD_LIBRARY_PATH
+
+python3 main.py -model $2 -init 4 -incre 4 -p benchmark -seed $1 --memory_size=100 --model_type='fcnet' --dataset='dsads' --init_epoch=50 --epochs=50 --init_lr=0.0001 --lr=0.0001  --init_milestones=[20, 40] --milestones=[20, 40]  --quantMethod="ours" --quantBits=$3 --quantFWDWgt="int" --quantFWDAct="int" --quantBWDAct="int" --quantBWDWgt="int" --quantBWDGrad1="stoch" --quantBWDGrad2="stoch"

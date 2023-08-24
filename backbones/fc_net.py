@@ -15,6 +15,21 @@ def get_activation(act_fun):
     assert 0
 
 
+class linl(nn.Module):
+
+  def __init__(self, in_dim, out_dim, act_fun):
+    super().__init__()
+    self.lw = nn.Linear(in_dim, out_dim)
+    self.act = get_activation(act_fun)
+
+  def forward(self, x):
+    # TOOD: no if block
+    if type(x) is dict:
+      x = self.lw(x)['logits']
+    else:
+      x = self.lw(x)
+    return self.act(x)
+
 class FCNet(nn.Module):
 
   def __init__(self, in_dim, hid_dim, out_dim, nr_hid_layers, act_fun="relu"):
@@ -29,15 +44,17 @@ class FCNet(nn.Module):
 
   def make_layers(self, in_dim, hid_dim, out_dim, nr_hid_layers, act_fun="relu"): 
     layers = []
-    for _ in range(nr_hid_layers+1):
-      layer = nn.Linear(in_dim, hid_dim)
-      setattr(self, "fc{}".format(_), layer)
-      layers.append(nn.Linear(in_dim, hid_dim))
-      layers.append(get_activation(act_fun))
-    layer = nn.Linear(in_dim, out_dim)
-    setattr(self, "fc{}".format(_+1), layer)
+    
+    layer = linl(in_dim, hid_dim, act_fun)
     layers.append(layer)
-    layers.append(get_activation(act_fun))
+
+    for _ in range(nr_hid_layers):
+      layer = linl(hid_dim, hid_dim, act_fun)
+      layers.append(layer)
+    
+    layer = linl(hid_dim, out_dim, act_fun)
+    layers.append(layer)
+
     return nn.Sequential(*layers)
 
   @property

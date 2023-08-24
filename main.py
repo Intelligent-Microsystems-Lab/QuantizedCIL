@@ -129,15 +129,13 @@ def setup_parser():
   # training parameters
   parser.add_argument('--init_epoch', type=int, default=170)
   parser.add_argument('--init_lr', type=float, default=0.05)
-  parser.add_argument('--init_milestones', nargs='+',
-                      type=int, default=[60, 100, 140])
+  parser.add_argument('--init_milestones', nargs='+', default=[60, 100, 140])
   parser.add_argument('--init_lr_decay', type=float, default=0.1)
   parser.add_argument('--init_weight_decay', type=float,
                       default=2e-4)  # 0.0005
   parser.add_argument('--epochs', type=int, default=170)
   parser.add_argument('--lr', type=float, default=0.05)
-  parser.add_argument('--milestones', nargs='+',
-                      type=int, default=[60, 100, 140])
+  parser.add_argument('--milestones', nargs='+', default=[60, 100, 140])
   parser.add_argument('--lr_decay', type=float, default=0.1)
   parser.add_argument('--weight_decay', type=float, default=2e-4)
   parser.add_argument('--num_workers', type=int, default=8)

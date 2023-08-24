@@ -120,7 +120,7 @@ def get_backbone(backbone_type, pretrained=False, args=None):
     return g_blcoks, s_blocks
   elif name == 'fcnet' and args is not None:
     
-    return FCNet(args["in_dim"], args["in_dim"], args["in_dim"], 2, "relu")
+    return FCNet(args["in_dim"], args["in_dim"], args["in_dim"], 0, "relu")
 
   else:
     raise NotImplementedError("Unknown type {}".format(backbone_type))
