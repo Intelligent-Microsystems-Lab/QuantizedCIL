@@ -318,7 +318,7 @@ class BiasLayer(nn.Module):
 
 class IncrementalNetWithBias(BaseNet):
   def __init__(self, backbone_type, pretrained, bias_correction=False, args=None):
-    super().__init__(backbone_type, pretrained)
+    super().__init__(backbone_type, pretrained, args)
 
     # Bias layer
     self.bias_correction = bias_correction
