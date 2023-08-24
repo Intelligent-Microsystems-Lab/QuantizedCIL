@@ -26,7 +26,7 @@ grad_quant_bias = {}
 class iCaRL(BaseLearner):
   def __init__(self, args):
     super().__init__(args)
-    self._network = IncrementalNet(args["model_type"], False)
+    self._network = IncrementalNet(args["model_type"], False, args=args)
     self.date_str = datetime.now().strftime('%y_%m_%d_%H_%M')
 
   def after_task(self):
@@ -136,6 +136,10 @@ class iCaRL(BaseLearner):
                 self._cur_task) + lname + '_' + stat_name + '.npy', torch.hstack(quant.track_stats['grad_stats'][lname][stat_name]).numpy())
 
   def _init_train(self, train_loader, test_loader, optimizer, scheduler):
+    
+    for name, param in self._network.state_dict().items():
+      print(f"{name} has datatype {param.dtype}")
+    
     prog_bar = tqdm(range(self.args['init_epoch']))
     for _, epoch in enumerate(prog_bar):
       self._network.train()
@@ -143,7 +147,7 @@ class iCaRL(BaseLearner):
       correct, total = 0, 0
       for i, (_, inputs, targets) in enumerate(train_loader):
         inputs, targets = inputs.to(self._device), targets.to(self._device)
-
+        
         # unquantized tracking
         # quant.calibrate_phase = True
         logits = self._network(inputs)["logits"]

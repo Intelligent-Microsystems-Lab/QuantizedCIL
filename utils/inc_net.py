@@ -118,20 +118,18 @@ def get_backbone(backbone_type, pretrained=False, args=None):
   elif name == 'memo_resnet50_imagenet':
     g_blcoks, s_blocks = memo_resnet50_imagenet()
     return g_blcoks, s_blocks
-
   elif name == 'fcnet' and args is not None:
-    return FCNet(args.in_dim, args.hid_dim, args.out_dim, args.nr_hid_layers,
-                 args.act_fun)
+    
+    return FCNet(args["in_dim"], args["in_dim"], args["in_dim"], 2, "relu")
 
   else:
     raise NotImplementedError("Unknown type {}".format(backbone_type))
 
 
 class BaseNet(nn.Module):
-  def __init__(self, backbone_type, pretrained):
+  def __init__(self, backbone_type, pretrained, args):
     super(BaseNet, self).__init__()
-
-    self.backbone = get_backbone(backbone_type, pretrained)
+    self.backbone = get_backbone(backbone_type, pretrained, args)
     self.fc = None
 
   @property
@@ -189,10 +187,9 @@ class BaseNet(nn.Module):
     test_acc = model_infos['test_acc']
     return test_acc
 
-
 class IncrementalNet(BaseNet):
-  def __init__(self, backbone_type, pretrained, gradcam=False):
-    super().__init__(backbone_type, pretrained)
+  def __init__(self, backbone_type, pretrained, gradcam=False, args=None):
+    super().__init__(backbone_type, pretrained, args)
     self.gradcam = gradcam
     if hasattr(self, "gradcam") and self.gradcam:
       self._gradcam_hooks = [None, None]
@@ -320,7 +317,7 @@ class BiasLayer(nn.Module):
 
 
 class IncrementalNetWithBias(BaseNet):
-  def __init__(self, backbone_type, pretrained, bias_correction=False):
+  def __init__(self, backbone_type, pretrained, bias_correction=False, args=None):
     super().__init__(backbone_type, pretrained)
 
     # Bias layer

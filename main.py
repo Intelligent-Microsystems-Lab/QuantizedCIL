@@ -5,7 +5,7 @@ from trainer import train
 
 def main():
   args = setup_parser().parse_args()
-  # args = eval_args(args)
+  args = eval_args(args)
   args.config = f"./exps/{args.model_name}.json"
   param = load_json(args.config)
   args = vars(args)  # Converting argparse Namespace to a dict.
@@ -24,50 +24,64 @@ def update_message(method, argname, value):
   print(f"Update {argname} to {value} because {method} is used.")
 
 
-# def eval_args(args):
-#   # prevent arguments conflict
-#   if args.quantMethod == "luq":
-#     if not args.quantizeFwd:
-#       update_message("luq", "quantizeFwd", True)
-#       args.quantizeFwd = True
-#     if not args.quantizeBwd:
-#       update_message("luq", "quantizeBwd", True)
-#       args.quantizeBwd = True
-#     if args.quantGradRound != "stoch":
-#       update_message("luq", "quantGradRound", "stoch")
-#       args.quantGradRound = "stoch" 
-#     if args.quantCalibrate:
-#       update_message("luq", "quantCalibrate", "max")
-#       args.quantCalibrate = "max"
-#     if args.quantizeTrack:
-#       update_message("luq", "quantizeTrack", False)
-#       args.quantizeTrack = False
-#   elif args.quantMethod == "ours":
-#     # TODO: add our quantization method
-#     if not args.quantizeFwd:
-#       update_message("ours", "quantizeFwd", True)
-#       args.quantizeFwd = True
-#     if not args.quantizeBwd:
-#       update_message("ours", "quantizeBwd", True)
-#       args.quantizeBwd = True
-#     if args.quantCalibrate:
-#       update_message("ours", "quantCalibrate", "max")
-#       args.quantCalibrate = "max"
-#     # if args.quantGradRound != "standard":
-#     #   update_message("ours", "quantGradRound", "standard")
-#     #   args.quantGradRound = "standard" 
-#     if args.quantizeTrack:
-#       update_message("ours", "quantizeTrack", False)
-#       args.quantizeTrack = False
-#   if args.quantizeTrack:
-#     # switching both off removes all quantization
-#     if args.quantizeFwd:
-#       update_message("quantizeTrack", "quantizeFwd", False)
-#       args.quantizeFwd = False
-#     if args.quantizeBwd:
-#       update_message("quantizeTrack", "quantizeBwd", False)
-#       args.quantizeBwd = False
-#   return args
+def eval_args(args):
+
+  args.dataset = args.dataset.lower()
+  if args.dataset == "dsads":
+    args.in_dim = 405
+  elif args.dataset == "pamap":
+    args.in_dim = 243
+  elif args.dataset == "hapt":
+    args.in_dim = 561
+  elif args.dataset == "wisdm":
+    args.in_dim = 91
+  else:
+    #TODO add other datasets
+    pass
+
+  # prevent arguments conflict
+  # if args.quantMethod == "luq":
+  #   if not args.quantizeFwd:
+  #     update_message("luq", "quantizeFwd", True)
+  #     args.quantizeFwd = True
+  #   if not args.quantizeBwd:
+  #     update_message("luq", "quantizeBwd", True)
+  #     args.quantizeBwd = True
+  #   if args.quantGradRound != "stoch":
+  #     update_message("luq", "quantGradRound", "stoch")
+  #     args.quantGradRound = "stoch" 
+  #   if args.quantCalibrate:
+  #     update_message("luq", "quantCalibrate", "max")
+  #     args.quantCalibrate = "max"
+  #   if args.quantizeTrack:
+  #     update_message("luq", "quantizeTrack", False)
+  #     args.quantizeTrack = False
+  # elif args.quantMethod == "ours":
+  #   # TODO: add our quantization method
+  #   if not args.quantizeFwd:
+  #     update_message("ours", "quantizeFwd", True)
+  #     args.quantizeFwd = True
+  #   if not args.quantizeBwd:
+  #     update_message("ours", "quantizeBwd", True)
+  #     args.quantizeBwd = True
+  #   if args.quantCalibrate:
+  #     update_message("ours", "quantCalibrate", "max")
+  #     args.quantCalibrate = "max"
+  #   # if args.quantGradRound != "standard":
+  #   #   update_message("ours", "quantGradRound", "standard")
+  #   #   args.quantGradRound = "standard" 
+  #   if args.quantizeTrack:
+  #     update_message("ours", "quantizeTrack", False)
+  #     args.quantizeTrack = False
+  # if args.quantizeTrack:
+  #   # switching both off removes all quantization
+  #   if args.quantizeFwd:
+  #     update_message("quantizeTrack", "quantizeFwd", False)
+  #     args.quantizeFwd = False
+  #   if args.quantizeBwd:
+  #     update_message("quantizeTrack", "quantizeBwd", False)
+  #     args.quantizeBwd = False
+  return args
 
 
 def setup_parser():
@@ -75,6 +89,7 @@ def setup_parser():
       description='Reproduce of multiple continual learning algorthms.')
 
   parser.add_argument('--dataset', type=str, default="cifar100")
+  parser.add_argument('--in_dim', type=int, default=0)
   parser.add_argument('--batch_size', type=int, default=128)
   parser.add_argument('--memory_size', '-ms', type=int, default=2000)
   parser.add_argument('--init_cls', '-init', type=int, default=10)

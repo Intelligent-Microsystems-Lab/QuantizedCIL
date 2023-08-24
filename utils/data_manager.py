@@ -75,9 +75,10 @@ class DataManager(object):
     data, targets = np.concatenate(data), np.concatenate(targets)
 
     if ret_data:
-      return data, targets, DummyDataset(data, targets, trsf, self.use_path)
+      return data, targets, DummyDataset(data, targets, trsf, self.use_path,
+                                         self.datatype)
     else:
-      return DummyDataset(data, targets, trsf, self.use_path)
+      return DummyDataset(data, targets, trsf, self.use_path, self.datatype)
 
   def get_dataset_with_split(
       self, indices, source, mode, appendent=None, val_samples_per_class=0
@@ -133,15 +134,17 @@ class DataManager(object):
         val_data), np.concatenate(val_targets)
 
     return DummyDataset(
-        train_data, train_targets, trsf, self.use_path
-    ), DummyDataset(val_data, val_targets, trsf, self.use_path)
+        train_data, train_targets, trsf, self.use_path, self.datatype
+    ), DummyDataset(val_data, val_targets, trsf, self.use_path, self.datatype)
 
   def _setup_data(self, dataset_name, shuffle, seed):
     idata = _get_idata(dataset_name)
     try:
       idata.download_data()
+      self.datatype = "image"
     except:
       idata.org_data()
+      self.datatype = "sensor"
 
     # Data
     self._train_data, self._train_targets = idata.train_data, idata.train_targets

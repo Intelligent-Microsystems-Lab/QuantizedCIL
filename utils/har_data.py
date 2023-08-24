@@ -248,5 +248,5 @@ def get_features_labels_users_from_df(df, label_col, user_col):
   label_data = df[label_col].values
   label_data = start_labels_at_zero(label_data)
   user_data = df[user_col].values
-  features = df.drop(columns=[label_col, user_col]).values
+  features = df.drop(columns=[label_col, user_col]).values.astype(np.float32)
   return features, label_data, user_data
