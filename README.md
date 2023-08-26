@@ -21,5 +21,35 @@ for i in 649323830 341384131 980310836 749032139 251745660 ; do for j in 4; do m
 ## HAR
 
 
+### DSADS
+```bash
+for i in 649323830 341384131 980310836 749032139 251745660 ; do for j in 4; do model=bic; qsub  -N ${model}_dsads_${j}fwd_w_int_a_int_bwd_g1_int_g2_int_w_int_a_stoch_${i} -o ./logs/${model}_dsads_${j}fwd_w_int_a_int_bwd_g1_int_g2_int_w_int_a_stoch_${i}.txt  -e ./logs/${model}_dsads_${j}fwd_w_int_a_int_bwd_g1_int_g2_int_w_int_a_stoch_${i}.txt run_dsads.script ${i} ${model} ${j}; done; done
+for i in 649323830 341384131 980310836 749032139 251745660 ; do for j in 4; do model=icarl; qsub  -N ${model}_dsads_${j}fwd_w_int_a_int_bwd_g1_int_g2_int_w_int_a_stoch_${i} -o ./logs/${model}_dsads_${j}fwd_w_int_a_int_bwd_g1_int_g2_int_w_int_a_stoch_${i}.txt  -e ./logs/${model}_dsads_${j}fwd_w_int_a_int_bwd_g1_int_g2_int_w_int_a_stoch_${i}.txt run_dsads.script ${i} ${model} ${j}; done; done
+for i in 649323830 341384131 980310836 749032139 251745660 ; do for j in 4; do model=lwf; qsub  -N ${model}_dsads_${j}fwd_w_int_a_int_bwd_g1_int_g2_int_w_int_a_stoch_${i} -o ./logs/${model}_dsads_${j}fwd_w_int_a_int_bwd_g1_int_g2_int_w_int_a_stoch_${i}.txt  -e ./logs/${model}_dsads_${j}fwd_w_int_a_int_bwd_g1_int_g2_int_w_int_a_stoch_${i}.txt run_dsads.script ${i} ${model} ${j}; done; done
+```
 
---dataset="dsads" --model_name="icarl" --init_cls=4 --incre=4  --model_type="fcnet" --epochs=100 --init_epoch=100 --memory_size=200 --init_lr=0.01 --lr=0.01 --init_milestones=50 --milestones=50
+
+### HAPT
+
+```bash
+for i in 649323830 341384131 980310836 749032139 251745660 ; do for j in 4; do model=bic; qsub  -N ${model}_hapt_${j}fwd_w_int_a_int_bwd_g1_int_g2_int_w_int_a_stoch_${i} -o ./logs/${model}_hapt_${j}fwd_w_int_a_int_bwd_g1_int_g2_int_w_int_a_stoch_${i}.txt  -e ./logs/${model}_hapt_${j}fwd_w_int_a_int_bwd_g1_int_g2_int_w_int_a_stoch_${i}.txt run_hapt.script ${i} ${model} ${j}; done; done
+for i in 649323830 341384131 980310836 749032139 251745660 ; do for j in 4; do model=icarl; qsub  -N ${model}_hapt_${j}fwd_w_int_a_int_bwd_g1_int_g2_int_w_int_a_stoch_${i} -o ./logs/${model}_hapt_${j}fwd_w_int_a_int_bwd_g1_int_g2_int_w_int_a_stoch_${i}.txt  -e ./logs/${model}_hapt_${j}fwd_w_int_a_int_bwd_g1_int_g2_int_w_int_a_stoch_${i}.txt run_hapt.script ${i} ${model} ${j}; done; done
+for i in 649323830 341384131 980310836 749032139 251745660 ; do for j in 4; do model=lwf; qsub  -N ${model}_hapt_${j}fwd_w_int_a_int_bwd_g1_int_g2_int_w_int_a_stoch_${i} -o ./logs/${model}_hapt_${j}fwd_w_int_a_int_bwd_g1_int_g2_int_w_int_a_stoch_${i}.txt  -e ./logs/${model}_hapt_${j}fwd_w_int_a_int_bwd_g1_int_g2_int_w_int_a_stoch_${i}.txt run_hapt.script ${i} ${model} ${j}; done; done
+```
+
+### PAMAP
+
+```bash
+for i in 649323830 341384131 980310836 749032139 251745660 ; do for j in 4; do model=bic; qsub  -N ${model}_pamap_${j}fwd_w_int_a_int_bwd_g1_int_g2_int_w_int_a_stoch_${i} -o ./logs/${model}_pamap_${j}fwd_w_int_a_int_bwd_g1_int_g2_int_w_int_a_stoch_${i}.txt  -e ./logs/${model}_pamap_${j}fwd_w_int_a_int_bwd_g1_int_g2_int_w_int_a_stoch_${i}.txt run_pamap.script ${i} ${model} ${j}; done; done
+for i in 649323830 341384131 980310836 749032139 251745660 ; do for j in 4; do model=icarl; qsub  -N ${model}_pamap_${j}fwd_w_int_a_int_bwd_g1_int_g2_int_w_int_a_stoch_${i} -o ./logs/${model}_pamap_${j}fwd_w_int_a_int_bwd_g1_int_g2_int_w_int_a_stoch_${i}.txt  -e ./logs/${model}_pamap_${j}fwd_w_int_a_int_bwd_g1_int_g2_int_w_int_a_stoch_${i}.txt run_pamap.script ${i} ${model} ${j}; done; done
+for i in 649323830 341384131 980310836 749032139 251745660 ; do for j in 4; do model=lwf; qsub  -N ${model}_pamap_${j}fwd_w_int_a_int_bwd_g1_int_g2_int_w_int_a_stoch_${i} -o ./logs/${model}_pamap_${j}fwd_w_int_a_int_bwd_g1_int_g2_int_w_int_a_stoch_${i}.txt  -e ./logs/${model}_pamap_${j}fwd_w_int_a_int_bwd_g1_int_g2_int_w_int_a_stoch_${i}.txt run_pamap.script ${i} ${model} ${j}; done; done
+```
+
+
+### WISDM
+
+```bash
+for i in 649323830 341384131 980310836 749032139 251745660 ; do for j in 4; do model=bic; qsub  -N ${model}_wisdm_${j}fwd_w_int_a_int_bwd_g1_int_g2_int_w_int_a_stoch_${i} -o ./logs/${model}_wisdm_${j}fwd_w_int_a_int_bwd_g1_int_g2_int_w_int_a_stoch_${i}.txt  -e ./logs/${model}_wisdm_${j}fwd_w_int_a_int_bwd_g1_int_g2_int_w_int_a_stoch_${i}.txt run_wisdm.script ${i} ${model} ${j}; done; done
+for i in 649323830 341384131 980310836 749032139 251745660 ; do for j in 4; do model=icarl; qsub  -N ${model}_wisdm_${j}fwd_w_int_a_int_bwd_g1_int_g2_int_w_int_a_stoch_${i} -o ./logs/${model}_wisdm_${j}fwd_w_int_a_int_bwd_g1_int_g2_int_w_int_a_stoch_${i}.txt  -e ./logs/${model}_wisdm_${j}fwd_w_int_a_int_bwd_g1_int_g2_int_w_int_a_stoch_${i}.txt run_wisdm.script ${i} ${model} ${j}; done; done
+for i in 649323830 341384131 980310836 749032139 251745660 ; do for j in 4; do model=lwf; qsub  -N ${model}_wisdm_${j}fwd_w_int_a_int_bwd_g1_int_g2_int_w_int_a_stoch_${i} -o ./logs/${model}_wisdm_${j}fwd_w_int_a_int_bwd_g1_int_g2_int_w_int_a_stoch_${i}.txt  -e ./logs/${model}_wisdm_${j}fwd_w_int_a_int_bwd_g1_int_g2_int_w_int_a_stoch_${i}.txt run_wisdm.script ${i} ${model} ${j}; done; done
+```

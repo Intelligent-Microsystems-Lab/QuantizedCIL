@@ -23,11 +23,13 @@ class linl(nn.Module):
     self.act = get_activation(act_fun)
 
   def forward(self, x):
+    
+    x = self.lw(x)
+    
     # TOOD: no if block
     if type(x) is dict:
-      x = self.lw(x)['logits']
-    else:
-      x = self.lw(x)
+      x = x['logits']
+
     return self.act(x)
 
 class FCNet(nn.Module):
