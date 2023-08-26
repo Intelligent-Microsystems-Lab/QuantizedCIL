@@ -121,7 +121,7 @@ def setup_parser():
   parser.add_argument('--quantBWDWgt', '-qbwdw', type=str,
                       default=None, required=False, choices=["int", 'noq'])
   parser.add_argument('--quantBWDAct', '-qbwda', type=str,
-                      default=None, required=False, choices=["int", 'noq'])
+                      default=None, required=False, choices=["int", 'noq', 'stoch'])
   parser.add_argument('--quantBWDGrad1', '-qbwdg1' , type=str, default="int",
                       required=False, choices=['stoch', 'sq', 'int', 'noq'])
   parser.add_argument('--quantBWDGrad2', '-qbwdg2' , type=str, default="int",

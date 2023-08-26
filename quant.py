@@ -573,6 +573,8 @@ class FLinearQ(torch.autograd.Function):
       x_h2 = dynamic_intQ(x_h2)
     elif quantBWDAct == 'noq':
       x_h2 = x_h2
+    elif quantBWDAct == 'stoch':
+      x_h2 = dynamic_stoch(x_h2)
     else:
       raise Exception('Grad rounding scheme not implemented: ' + quantBWDAct)
 
@@ -642,46 +644,46 @@ class Linear_Ours(nn.Linear):
 
   def forward(self, input):
 
-    if self.quantizeFwd:
+    # if self.quantizeFwd:
 
-      if quantFWDWgt == 'sawb':
-        w_q = UniformQuantizeSawb.apply(
-              self.weight, self.c1, self.c2, self.QpW, self.QnW)
-      elif quantFWDWgt == 'int':
-        w_q = dynamic_intQ_FWD.apply(self.weight)
-      elif quantFWDWgt == 'lsq':
-        w_q = lsq(self.weight, self.lsq_wgt, self.QpW, self.QnW)
-      else:
-        raise Exception('FWD weight quantized method not implemented: ' + quantFWDWgt)
-
-
-      if torch.min(input) < 0:
-        self.QnA = -2 ** (self.abits - 1) + 1
-        self.QpA = 2 ** (self.wbits - 1) - 1
-
-      if quantFWDAct == 'sawb':
-        qinput = UniformQuantizeSawb.apply(
-              input, self.c1, self.c2, self.QpA, self.QnA)
-      elif quantFWDAct == 'int':
-        qinput = dynamic_intQ_FWD.apply(input)
-      elif quantFWDAct == 'lsq':
-        qinput = lsq(input, self.lsq_wgt, self.QpA, self.QnA)
-      elif quantFWDAct == 'noq':
-        qinput = input
-      else:
-        raise Exception('FWD act quantized method not implemented: ' + quantFWDWgt)
-
-      # TODO: optimize speed of hadamard creation
-      if input.shape[0] != quantBatchSize:
-        h_bs = torch.tensor(make_hadamard(
-            input.shape[0]), dtype=self.weight.dtype).to(self.weight.device)
-      else:
-        h_bs = self.hadamard_bs
-
-      output = FLinearQ.apply(qinput, w_q, self.hadamard_out, h_bs) + self.bias
-
+    if quantFWDWgt == 'sawb':
+      w_q = UniformQuantizeSawb.apply(
+            self.weight, self.c1, self.c2, self.QpW, self.QnW)
+    elif quantFWDWgt == 'int':
+      w_q = dynamic_intQ_FWD.apply(self.weight)
+    elif quantFWDWgt == 'lsq':
+      w_q = lsq(self.weight, self.lsq_wgt, self.QpW, self.QnW)
     else:
-      output = F.linear(input, self.weight, self.bias)
+      raise Exception('FWD weight quantized method not implemented: ' + quantFWDWgt)
+
+
+    if torch.min(input) < 0:
+      self.QnA = -2 ** (self.abits - 1) + 1
+      self.QpA = 2 ** (self.wbits - 1) - 1
+
+    if quantFWDAct == 'sawb':
+      qinput = UniformQuantizeSawb.apply(
+            input, self.c1, self.c2, self.QpA, self.QnA)
+    elif quantFWDAct == 'int':
+      qinput = dynamic_intQ_FWD.apply(input)
+    elif quantFWDAct == 'lsq':
+      qinput = lsq(input, self.lsq_wgt, self.QpA, self.QnA)
+    elif quantFWDAct == 'noq':
+      qinput = input
+    else:
+      raise Exception('FWD act quantized method not implemented: ' + quantFWDWgt)
+
+    # TODO: optimize speed of hadamard creation
+    if input.shape[0] != quantBatchSize:
+      h_bs = torch.tensor(make_hadamard(
+          input.shape[0]), dtype=self.weight.dtype).to(self.weight.device)
+    else:
+      h_bs = self.hadamard_bs
+
+    output = FLinearQ.apply(qinput, w_q, self.hadamard_out, h_bs) + self.bias
+
+    # else:
+    #   output = F.linear(input, self.weight, self.bias)
 
     return {'logits': output}
 
@@ -705,60 +707,60 @@ class Conv2d_Ours(nn.Conv2d):
 
   def forward(self, input):
 
-    if self.quantizeFwd:
-      if quantFWDWgt == 'sawb':
-        w_q = UniformQuantizeSawb.apply(
-              self.weight, self.c1, self.c2, self.QpW, self.QnW)
-      elif quantFWDWgt == 'int':
-        w_q = dynamic_intQ_FWD.apply(self.weight)
-      elif quantFWDWgt == 'lsq':
-        w_q = lsq(self.weight, self.lsq_wgt, self.QpW, self.QnW)
-      else:
-        raise Exception('FWD weight quantized method not implemented: ' + quantFWDWgt)
-
-      if torch.min(input) < 0:
-        self.QnA = -2 ** (self.abits - 1) + 1
-        self.QpA = 2 ** (self.wbits - 1) - 1
-
-      if quantFWDAct == 'sawb':
-        qinput = UniformQuantizeSawb.apply(
-              input, self.c1, self.c2, self.QpA, self.QnA)
-      elif quantFWDAct == 'int':
-        qinput = dynamic_intQ_FWD.apply(input)
-      elif quantFWDAct == 'lsq':
-        qinput = lsq(input, self.lsq_wgt, self.QpA, self.QnA)
-      elif quantFWDAct == 'noq':
-        qinput = input
-      else:
-        raise Exception('FWD act quantized method not implemented: ' + quantFWDWgt)
-
-      # TODO: optimize speed of hadamard creation
-
-      qinput = torch.nn.functional.unfold(
-          qinput, self.kernel_size, padding=self.padding, stride=self.stride).transpose(1, 2)
-      w_q = w_q.view(w_q.size(0), -1).t()
-
-      if self.hadamard_bs.sum() == 0:
-        self.hadamard_bs = torch.tensor(make_hadamard(
-            qinput.shape[1]), dtype=self.weight.dtype).to(self.weight.device)
-
-      flinearq_fn = torch.vmap(FLinearQ.apply, randomness = 'different')
-      out = flinearq_fn(qinput, w_q.T.unsqueeze(0).repeat(qinput.shape[0], 1, 1), self.hadamard_out.unsqueeze(
-          0).repeat(qinput.shape[0], 1, 1), self.hadamard_bs.unsqueeze(0).repeat(qinput.shape[0], 1, 1))
-
-      # out = []
-      # for i in range(qinput.shape[0]):
-      #   out.append(FLinearQ.apply(qinput[i,:], w_q.T, self.hadamard_out, self.hadamard_bs))
-      # out = torch.stack(out)
-
-      # reshaping outputs into image form with batch, channel, height, width
-      out = out.transpose(1, 2)
-      output = out.view((input.shape[0], self.out_channels, int(
-          input.shape[-2] / self.stride[0]), int(input.shape[-1] / self.stride[1]))) + self.bias.view(1, -1, 1, 1)
-
-      # np.testing.assert_allclose(output_cmp.cpu().detach().numpy(), output.cpu().detach().numpy(), rtol=1e-05, atol=1e-2)
-
+    # if self.quantizeFwd:
+    if quantFWDWgt == 'sawb':
+      w_q = UniformQuantizeSawb.apply(
+            self.weight, self.c1, self.c2, self.QpW, self.QnW)
+    elif quantFWDWgt == 'int':
+      w_q = dynamic_intQ_FWD.apply(self.weight)
+    elif quantFWDWgt == 'lsq':
+      w_q = lsq(self.weight, self.lsq_wgt, self.QpW, self.QnW)
     else:
-      output = F.linear(input, self.weight, self.bias)
+      raise Exception('FWD weight quantized method not implemented: ' + quantFWDWgt)
+
+    if torch.min(input) < 0:
+      self.QnA = -2 ** (self.abits - 1) + 1
+      self.QpA = 2 ** (self.wbits - 1) - 1
+
+    if quantFWDAct == 'sawb':
+      qinput = UniformQuantizeSawb.apply(
+            input, self.c1, self.c2, self.QpA, self.QnA)
+    elif quantFWDAct == 'int':
+      qinput = dynamic_intQ_FWD.apply(input)
+    elif quantFWDAct == 'lsq':
+      qinput = lsq(input, self.lsq_wgt, self.QpA, self.QnA)
+    elif quantFWDAct == 'noq':
+      qinput = input
+    else:
+      raise Exception('FWD act quantized method not implemented: ' + quantFWDWgt)
+
+    # TODO: optimize speed of hadamard creation
+
+    qinput = torch.nn.functional.unfold(
+        qinput, self.kernel_size, padding=self.padding, stride=self.stride).transpose(1, 2)
+    w_q = w_q.view(w_q.size(0), -1).t()
+
+    if self.hadamard_bs.sum() == 0:
+      self.hadamard_bs = torch.tensor(make_hadamard(
+          qinput.shape[1]), dtype=self.weight.dtype).to(self.weight.device)
+
+    flinearq_fn = torch.vmap(FLinearQ.apply, randomness = 'different')
+    out = flinearq_fn(qinput, w_q.T.unsqueeze(0).repeat(qinput.shape[0], 1, 1), self.hadamard_out.unsqueeze(
+        0).repeat(qinput.shape[0], 1, 1), self.hadamard_bs.unsqueeze(0).repeat(qinput.shape[0], 1, 1))
+
+    # out = []
+    # for i in range(qinput.shape[0]):
+    #   out.append(FLinearQ.apply(qinput[i,:], w_q.T, self.hadamard_out, self.hadamard_bs))
+    # out = torch.stack(out)
+
+    # reshaping outputs into image form with batch, channel, height, width
+    out = out.transpose(1, 2)
+    output = out.view((input.shape[0], self.out_channels, int(
+        input.shape[-2] / self.stride[0]), int(input.shape[-1] / self.stride[1]))) + self.bias.view(1, -1, 1, 1)
+
+    # np.testing.assert_allclose(output_cmp.cpu().detach().numpy(), output.cpu().detach().numpy(), rtol=1e-05, atol=1e-2)
+
+    # else:
+    #   output = F.linear(input, self.weight, self.bias)
 
     return output
