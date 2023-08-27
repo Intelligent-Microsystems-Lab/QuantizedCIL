@@ -9,4 +9,4 @@ export LD_LIBRARY_PATH=/afs/crc.nd.edu/user/c/cschaef6/.local/lib/cuda-12.1/lib6
 export LD_LIBRARY_PATH=/afs/crc.nd.edu/user/c/cschaef6/.local/lib/cudnn-linux-x86_64-8.8.1.3_cuda11-archive/lib:$LD_LIBRARY_PATH
 export LD_LIBRARY_PATH=/afs/crc.nd.edu/user/c/cschaef6/.local/lib/nccl_2.17.1-1+cuda11.0_x86_64/lib:$LD_LIBRARY_PATH
 
-python3 main.py -model $2 -p benchmark -seed $1 --dataset="pamap" --init_cls=2 --incre=2  --model_type="fcnet" --epochs=100 --init_epoch=100 --memory_size=200 --init_lr=0.01 --lr=0.01 --init_milestones=50 --milestones=50  --quantMethod="ours" --quantBits=$3 --quantFWDWgt="int" --quantFWDAct="int" --quantBWDAct="int" --quantBWDWgt="int" --quantBWDGrad1="int" --quantBWDGrad2="int"
+python3 main.py -model $2 -p benchmark -seed $1 --dataset="pamap" --init_cls=2 --incre=2  --model_type="fcnet" --epochs=100 --init_epoch=100 --memory_size=200 --init_lr=0.01 --lr=0.01 --init_milestones=50 --milestones=50  # --quantMethod="ours" --quantBits=$3 --quantFWDWgt="int" --quantFWDAct="int" --quantBWDAct="int" --quantBWDWgt="int" --quantBWDGrad1="int" --quantBWDGrad2="int"
