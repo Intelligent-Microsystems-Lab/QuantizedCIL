@@ -1,11 +1,7 @@
 # Quantized Class Incremental Learning
 
-## sources
-- https://openreview.net/forum?id=yTbNYYcopd 
-- https://github.com/zhoudw-zdw/CIL_Survey 
-
 ```python
-python3 main.py 
+python3 main.py
 ```
 
 ```bash
@@ -53,3 +49,7 @@ for i in 649323830 341384131 980310836 749032139 251745660 ; do for j in 4; do m
 for i in 649323830 341384131 980310836 749032139 251745660 ; do for j in 4; do model=icarl; qsub  -N ${model}_wisdm_${j}fwd_w_int_a_int_bwd_g1_int_g2_int_w_int_a_stoch_${i} -o ./logs/${model}_wisdm_${j}fwd_w_int_a_int_bwd_g1_int_g2_int_w_int_a_stoch_${i}.txt  -e ./logs/${model}_wisdm_${j}fwd_w_int_a_int_bwd_g1_int_g2_int_w_int_a_stoch_${i}.txt run_wisdm.script ${i} ${model} ${j}; done; done
 for i in 649323830 341384131 980310836 749032139 251745660 ; do for j in 4; do model=lwf; qsub  -N ${model}_wisdm_${j}fwd_w_int_a_int_bwd_g1_int_g2_int_w_int_a_stoch_${i} -o ./logs/${model}_wisdm_${j}fwd_w_int_a_int_bwd_g1_int_g2_int_w_int_a_stoch_${i}.txt  -e ./logs/${model}_wisdm_${j}fwd_w_int_a_int_bwd_g1_int_g2_int_w_int_a_stoch_${i}.txt run_wisdm.script ${i} ${model} ${j}; done; done
 ```
+
+## Sources
+- https://openreview.net/forum?id=yTbNYYcopd 
+- https://github.com/zhoudw-zdw/CIL_Survey 

@@ -26,7 +26,7 @@ class linl(nn.Module):
     
     x = self.lw(x)
     
-    # TOOD: no if block
+    # TODO: no if block
     if type(x) is dict:
       x = x['logits']
 
