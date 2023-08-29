@@ -5,6 +5,8 @@ import logging
 import os
 import sys
 import time
+import random
+import numpy as np
 
 import torch
 from utils import factory
@@ -187,12 +189,14 @@ def _set_device(args):
 
 
 def _set_random():
+  random.seed(seed)
+  np.random.seed(seed)
   torch.manual_seed(1)
   torch.cuda.manual_seed(1)
   torch.cuda.manual_seed_all(1)
   torch.backends.cudnn.deterministic = True
   torch.backends.cudnn.benchmark = False
-
+  
 
 def print_args(args):
   for key, value in args.items():
