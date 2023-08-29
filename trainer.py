@@ -84,7 +84,7 @@ def _train(args):
   with open(config_filepath, "w") as fd:
     json.dump(args, fd, indent=2, sort_keys=True, cls=ConfigEncoder)
 
-  _set_random()
+  _set_random(args["seed"])
   _set_device(args)
   print_args(args)
   data_manager = DataManager(
@@ -188,7 +188,8 @@ def _set_device(args):
   # print(os.environ["CUDA_VISIBLE_DEVICES"])
 
 
-def _set_random():
+def _set_random(seed):
+  # TODO want same model for each experiment start?
   random.seed(seed)
   np.random.seed(seed)
   torch.manual_seed(1)
