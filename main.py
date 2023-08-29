@@ -143,6 +143,7 @@ def setup_parser():
   parser.add_argument('--lamda', type=float, default=3)
   parser.add_argument('--split_ratio', type=float, default=0.1)
   parser.add_argument('--fc_hid_dim', type=int, default=100)
+  parser.add_argument('--fc_nr_hid', type=int, default=0)
 
   return parser
 
