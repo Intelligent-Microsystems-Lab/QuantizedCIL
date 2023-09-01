@@ -29,6 +29,7 @@ class iCaRL(BaseLearner):
     self._network = IncrementalNet(args["model_type"], False, args=args)
     self.date_str = datetime.now().strftime('%y_%m_%d_%H_%M')
 
+
   def after_task(self):
     self._old_network = self._network.copy().freeze()
     self._known_classes = self._total_classes
@@ -39,11 +40,13 @@ class iCaRL(BaseLearner):
     self._total_classes = self._known_classes + data_manager.get_task_size(
         self._cur_task
     )
+    
 
     self._network.update_fc(self._total_classes)
     logging.info(
         "Learning on {}-{}".format(self._known_classes, self._total_classes)
     )
+
 
     lin_w, lin_b = quant.save_lin_params(self._network)
     if quant.quantTrack:
@@ -52,6 +55,13 @@ class iCaRL(BaseLearner):
       quant.place_quant(self._network, lin_w, lin_b)
     else:
       pass
+
+    # # compute norm
+    # print('after place quant')
+    # for n,w in self._network.named_parameters():
+    #   if 'weight' in n:
+    #     print(n)
+    #     print(torch.norm(w))
 
     train_dataset = data_manager.get_dataset(
         np.arange(self._known_classes, self._total_classes),
@@ -135,6 +145,13 @@ class iCaRL(BaseLearner):
             np.save('track_stats/' + self.date_str + '_' + self.args['dataset'] + '_' + self.args['model_name'] + '_' + str(
                 self._cur_task) + lname + '_' + stat_name + '.npy', torch.hstack(quant.track_stats['grad_stats'][lname][stat_name]).numpy())
 
+    # print('train')
+    # for n,w in self._network.named_parameters():
+    #   if 'weight' in n:
+    #     print(n)
+    #     print(torch.norm(w))
+
+
   def _init_train(self, train_loader, test_loader, optimizer, scheduler):
         
     prog_bar = tqdm(range(self.args['init_epoch']))
@@ -214,6 +231,12 @@ class iCaRL(BaseLearner):
       prog_bar.set_description(info)
 
     logging.info(info)
+    # print('init_train')
+    # for n,w in self._network.named_parameters():
+    #   if 'weight' in n:
+    #     print(n)
+    #     print(torch.norm(w))
+
 
   def _update_representation(self, train_loader, test_loader, optimizer, scheduler):
     prog_bar = tqdm(range(self.args['epochs']))

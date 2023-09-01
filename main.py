@@ -114,7 +114,7 @@ def setup_parser():
                                                              'ours'])
   parser.add_argument('--quantFWDWgt', '-qfwdw', type=str,
                       default=None, required=False, choices=['sawb', "int",
-                                                             'lsq', 'noq'])
+                                                             'lsq', 'noq', 'mem'])
   parser.add_argument('--quantFWDAct', '-qfwda', type=str,
                       default=None, required=False, choices=['sawb', "int",
                                                              'lsq', 'noq'])
