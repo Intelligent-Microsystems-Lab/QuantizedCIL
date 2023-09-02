@@ -39,7 +39,7 @@ def get_pamap(remove_bad=True):
                            18: "folding laundry", 19: "house cleaning",
                            20: "playing soccer", 24: "rope jumping",
                            0: "other"}
-  df = pd.DataFrame(io.loadmat('../Data/pamap/generated/pamap.mat')["data_pamap"])
+  df = pd.DataFrame(io.loadmat('../../Data/pamap/generated/pamap.mat')["data_pamap"])
   # df = pd.read_csv("../Data/pamap/generated/pamap.csv", header=None)
   label_pos = 243
   person_column = 244

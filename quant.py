@@ -30,7 +30,7 @@ quantCalibrate = "max"
 quantTrack = False
 quantBits = 4
 quantAccBits = 16
-quantWgtStoreBits = 8
+quantWgtStoreBits = 16
 quantMethod = 'ours'
 quantBatchSize = 128
 quantFWDWgt = 'int'
@@ -665,10 +665,14 @@ class Linear_Ours(nn.Linear):
     self.lsq_wgt = Parameter(torch.tensor(
         [self.weight.abs().mean() * 2 / np.sqrt(self.QpW)], dtype=torch.float32))
 
+    if 'backbone' not in uname:
+      scale_dyn_range = 1.1
+    else:
+      scale_dyn_range = 2.0
 
-    # make range 5x bigger
-    # self.ws = (self.weight.abs().max() * 5)/(2**(quantWgtStoreBits-1)-1)
-    # self.weight = torch.nn.Parameter( torch.round(self.weight / (self.ws + 1e-32)))
+    with torch.no_grad():
+      self.sw = (self.weight.abs().max() * scale_dyn_range)/(2**(quantWgtStoreBits-1)-1)
+      self.weight.data = torch.round(self.weight / (self.sw + 1e-32))
 
     # init_wq, s = dynamic_intQ(self.weight)
     # self.weight = torch.nn.Parameter(init_wq)
@@ -689,13 +693,14 @@ class Linear_Ours(nn.Linear):
       w_q = lsq(self.weight, self.lsq_wgt, self.QpW, self.QnW)
     elif quantFWDWgt == 'mem':
       # make sure grad updates
-      tmp_w = torch.clip(self.weight, -(2**(quantWgtStoreBits-1)-1), (2**(quantWgtStoreBits-1)-1))
-      tmp_w = torch.round(tmp_w)
+      with torch.no_grad():
+        tmp_w = torch.clip(self.weight, -(2**(quantWgtStoreBits-1)-1), (2**(quantWgtStoreBits-1)-1))
+        tmp_w = torch.round(tmp_w)
 
-      self.weight = torch.nn.Parameter(tmp_w)
+        self.weight.data = tmp_w
 
       w_q = self.weight
-      sw = self.ws
+      sw = self.sw
     else:
       raise Exception('FWD weight quantized method not implemented: ' + quantFWDWgt)
 
