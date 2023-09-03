@@ -29,8 +29,8 @@ quantizeBwd = False
 quantCalibrate = "max"
 quantTrack = False
 quantBits = 4
-quantAccBits = 16
-quantWgtStoreBits = 16
+quantAccBits = 8
+quantWgtStoreBits = 8
 quantMethod = 'ours'
 quantBatchSize = 128
 quantFWDWgt = 'int'
@@ -48,6 +48,48 @@ QnA = None
 quantGradMxScale = 1.
 
 scale_library = {'a': {}, 'w': {}, 'g': {}}
+
+
+class QuantMomentumOptimizer(torch.optim.Optimizer):
+      
+  # Init Method:
+  def __init__(self, params, lr=1e-3, momentum=0.9):
+    super(QuantMomentumOptimizer, self).__init__(params, defaults={'lr': lr})
+    self.momentum = momentum
+    self.state = dict()
+    for group in self.param_groups:
+      for p in group['params']:
+        if p.grad is not None:
+          self.state[p] = dict(mom=torch.zeros_like(p.data))
+    
+  # Step Method
+  def step(self):
+    for group in self.param_groups:
+      for p in group['params']:
+        if p not in self.state:
+          self.state[p] = dict(mom=torch.zeros_like(p.data))
+        if p.grad is not None:
+
+          mom = self.state[p]['mom']
+
+          mx =  (2**(quantAccBits-1)-1) # p.grad.abs().max() #
+          scale = mx/(2**(group['lr']-1)-1)
+          # import pdb; pdb.set_trace()
+          print('-------' + str(p.data.shape))
+          print(p.grad.data.abs().sum())
+          g = torch.clamp(p.grad.data, -mx, mx)
+          g = torch.round(g/(scale + 1e-32))
+
+          # how to quantize?
+          mom = self.momentum * mom + (1-self.momentum) * g
+
+          mx = (2**(group['lr']-1)-1)
+          mom = torch.clamp(mom, -mx, mx)
+          mom = torch.round(mom)
+
+          p.data -= g # mom
+          print(g.abs().sum())
+          self.state[p]['mom'] = mom
 
 
 def init_properties(obj, uname):
@@ -164,13 +206,29 @@ def place_quant(m, lin_w, lin_b, c_path='',):
             tmp_meth = Linear_Ours
           else:
             raise Exception('Unknown quant method: ' + quantMethod)
+
+          if hasattr(getattr(m, attr_str), 'sw'):
+            old_sw = getattr(m, attr_str).sw
+          else:
+            old_sw = None
           setattr(m, attr_str, tmp_meth(in_features=target_attr.in_features,
                                         out_features=target_attr.out_features,
                                         bias=hasattr(target_attr, 'bias'),
                                         uname=c_path + '_' + attr_str,))
           
           if lin_w is not None and attr_str == 'fc':
-            m.fc.weight = nn.Parameter(lin_w)
+
+            if quantFWDWgt == 'mem':
+              if old_sw is None:
+                pass
+              else:
+                scale_dyn_range = 2.0
+                lin_w = lin_w/scale_dyn_range
+                lin_w = torch.round(lin_w)
+                m.fc.sw.data = old_sw*scale_dyn_range
+                m.fc.weight.data = lin_w
+            else:
+              m.fc.weight.data = lin_w
           if lin_b is not None and attr_str == 'fc':
             m.fc.bias = nn.Parameter(lin_b)
   for n, ch in m.named_children():
@@ -539,6 +597,13 @@ class FLinearQ(torch.autograd.Function):
   @staticmethod
   def forward(x, w, h_out, h_bs, sx, sw):
 
+    if quantFWDWgt == 'mem':
+      # only get quantFWDWgt
+      mx = 2**(quantWgtStoreBits-1)-1
+      scale = mx/(2**(quantBits-1)-1)
+      w = torch.clamp(w, -mx, mx)
+      w = torch.round(w/(scale + 1e-32))
+
     output = F.linear(x, w)
 
     # requantize to int16 (clamp to big values - no scale)
@@ -583,9 +648,9 @@ class FLinearQ(torch.autograd.Function):
 
     # print(torch.unique(grad_output_h1).shape[0])
     # TODO biggest power of two can be optimized
-    grad_input = (grad_output_h1 @ w_h1) * 1 / biggest_power2_factor(h_out.shape[0])
+    grad_input = (grad_output_h1 @ w_h1) 
     n = 2**quantAccBits/2 - 1
-    grad_input = torch.clamp(grad_input, -n, n)
+    grad_input = torch.clamp(grad_input, -n, n) * 1 / biggest_power2_factor(h_out.shape[0])
 
     x_h2 = h_bs @ x
     # requantize acts
@@ -614,11 +679,12 @@ class FLinearQ(torch.autograd.Function):
 
     # print(torch.unique(grad_output_h2).shape[0])
 
-    grad_w = (grad_output_h2 @ x_h2) * 1 / biggest_power2_factor(h_bs.shape[0])
+    grad_w = (grad_output_h2 @ x_h2) # * 1 / biggest_power2_factor(h_bs.shape[0])
     n = 2**quantAccBits/2 - 1
     grad_w = torch.clamp(grad_w, -n, n)
 
-    return grad_input * sg1 * swh1 * sw, grad_w * sg2 * sxh2 * sx, None, None, None, None
+    # * sg2 * sxh2 * sx
+    return grad_input * sg1 * swh1 * sw, grad_w, None, None, None, None
 
 
 def grad_scale(x, scale):
@@ -665,22 +731,30 @@ class Linear_Ours(nn.Linear):
     self.lsq_wgt = Parameter(torch.tensor(
         [self.weight.abs().mean() * 2 / np.sqrt(self.QpW)], dtype=torch.float32))
 
-    if 'backbone' not in uname:
-      scale_dyn_range = 1.1
-    else:
-      scale_dyn_range = 2.0
 
-    with torch.no_grad():
-      self.sw = (self.weight.abs().max() * scale_dyn_range)/(2**(quantWgtStoreBits-1)-1)
-      self.weight.data = torch.round(self.weight / (self.sw + 1e-32))
+    if quantFWDWgt == 'mem':
+      if 'backbone' not in uname:
+        scale_dyn_range = 1.1
+      else:
+        scale_dyn_range = 2.0
 
-    # init_wq, s = dynamic_intQ(self.weight)
-    # self.weight = torch.nn.Parameter(init_wq)
-    # import pdb; pdb.set_trace()
+      # DEBUG!!!!
+      # scale_dyn_range = .975
+      # DEBUG!!!!
+
+      with torch.no_grad():
+
+        mx = self.weight.abs().max() * scale_dyn_range
+        scale = mx/(2**(quantWgtStoreBits-1)-1)
+
+        mult_mx = 2**(quantWgtStoreBits-1)-1
+        mult_scale = mult_mx/(2**(quantBits-1)-1)
+
+        self.register_buffer('sw', scale * mult_scale)
+        self.weight.data = torch.round(self.weight / (scale + 1e-32))
+
 
   def forward(self, input):
-
-    # if self.quantizeFwd:
 
     if quantFWDWgt == 'sawb':
       raise Exception('not implemented')
@@ -732,9 +806,6 @@ class Linear_Ours(nn.Linear):
 
     output = FLinearQ.apply(qinput, w_q, self.hadamard_out, h_bs, sa, sw) + self.bias
 
-    # else:
-    #   output = F.linear(input, self.weight, self.bias)
-
     return {'logits': output}
 
 
@@ -755,8 +826,18 @@ class Conv2d_Ours(nn.Conv2d):
     self.lsq_wgt = Parameter(torch.tensor(
         [self.weight.abs().mean() * 2 / np.sqrt(self.QpW)], dtype=torch.float32))
 
-    # init_wq, _ = dynamic_intQ(self.weight)
-    # self.weight = torch.nn.Parameter(init_wq)
+    if quantFWDWgt == 'mem':
+      if 'backbone' not in uname:
+        scale_dyn_range = 1.1
+      else:
+        scale_dyn_range = 2.0
+      with torch.no_grad():
+
+        mx = self.weight.abs().max() * scale_dyn_range
+        scale = mx/(2**(quantWgtStoreBits-1)-1)
+
+        self.register_buffer('sw', scale)
+        self.weight.data = torch.round(self.weight / (scale + 1e-32))
 
   def forward(self, input):
 
@@ -770,6 +851,16 @@ class Conv2d_Ours(nn.Conv2d):
     elif quantFWDWgt == 'lsq':
       raise Exception('not implemented')
       w_q = lsq(self.weight, self.lsq_wgt, self.QpW, self.QnW)
+    elif quantFWDWgt == 'mem':
+      # make sure grad updates
+      with torch.no_grad():
+        tmp_w = torch.clip(self.weight, -(2**(quantWgtStoreBits-1)-1), (2**(quantWgtStoreBits-1)-1))
+        tmp_w = torch.round(tmp_w)
+
+        self.weight.data = tmp_w
+
+      w_q = self.weight
+      sw = self.sw
     else:
       raise Exception('FWD weight quantized method not implemented: ' + quantFWDWgt)
 

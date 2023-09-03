@@ -22,6 +22,7 @@ track_layer_list = ['_convnet_conv_1_3x3', '_convnet_stage_1_2_conv_b',
 
 grad_quant_bias = {}
 
+torch.autograd.set_detect_anomaly(True)
 
 class iCaRL(BaseLearner):
   def __init__(self, args):
@@ -71,7 +72,7 @@ class iCaRL(BaseLearner):
     )
     self.train_loader = DataLoader(
         train_dataset, batch_size=self.args['batch_size'], shuffle=True,
-        num_workers=self.args['num_workers']
+        num_workers=self.args['num_workers'],
     )
     test_dataset = data_manager.get_dataset(
         np.arange(0, self._total_classes), source="test", mode="test"
@@ -108,23 +109,33 @@ class iCaRL(BaseLearner):
       self._old_network.to(self._device)
 
     if self._cur_task == 0:
-      optimizer = optim.SGD(
+      # optimizer = optim.SGD(
+      #     self._network.parameters(),
+      #     momentum=0.9,
+      #     lr=self.args['init_lr'],
+      #     weight_decay=self.args['init_weight_decay'],
+      # )
+      optimizer = quant.QuantMomentumOptimizer(
           self._network.parameters(),
           momentum=0.9,
           lr=self.args['init_lr'],
-          weight_decay=self.args['init_weight_decay'],
-      )
+        )
       scheduler = optim.lr_scheduler.MultiStepLR(
           optimizer=optimizer, milestones=self.args['init_milestones'], gamma=self.args['init_lr_decay']
       )
       self._init_train(train_loader, test_loader, optimizer, scheduler)
     else:
-      optimizer = optim.SGD(
+      # optimizer = optim.SGD(
+      #     self._network.parameters(),
+      #     lr=self.args['lr'],
+      #     momentum=0.9,
+      #     weight_decay=self.args['weight_decay'],
+      # )  # 1e-5
+      optimizer = quant.QuantMomentumOptimizer(
           self._network.parameters(),
-          lr=self.args['lr'],
           momentum=0.9,
-          weight_decay=self.args['weight_decay'],
-      )  # 1e-5
+          lr=self.args['init_lr'],
+        )
       scheduler = optim.lr_scheduler.MultiStepLR(
           optimizer=optimizer, milestones=self.args['milestones'], gamma=self.args['lr_decay']
       )
@@ -155,7 +166,13 @@ class iCaRL(BaseLearner):
   def _init_train(self, train_loader, test_loader, optimizer, scheduler):
         
     prog_bar = tqdm(range(self.args['init_epoch']))
-    for _, epoch in enumerate(prog_bar):
+    for i, epoch in enumerate(prog_bar):
+
+      if i == 0:
+        self._network.to('cpu')
+        self._device = 'cpu'
+        optimizer.load_state_dict(optimizer.state_dict())
+
       self._network.train()
       losses = 0.0
       correct, total = 0, 0
@@ -227,7 +244,7 @@ class iCaRL(BaseLearner):
             losses / len(train_loader),
             train_acc,
         )
-      scheduler.step()
+      # scheduler.step()
       prog_bar.set_description(info)
 
     logging.info(info)
@@ -300,7 +317,7 @@ class iCaRL(BaseLearner):
             losses / len(train_loader),
             train_acc,
         )
-      scheduler.step()
+      # scheduler.step()
       prog_bar.set_description(info)
     logging.info(info)
 
