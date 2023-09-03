@@ -78,16 +78,30 @@ class LwF(BaseLearner):
       self._old_network.to(self._device)
 
     if self._cur_task == 0:
-      optimizer = optim.SGD(
-          self._network.parameters(),
-          momentum=0.9,
-          lr=self.args['init_lr'],
-          weight_decay=self.args['init_weight_decay'],
-      )
-      scheduler = optim.lr_scheduler.MultiStepLR(
+      if self.args["optimizer"] == "sgd":
+        optimizer = optim.SGD(
+            self._network.parameters(),
+            momentum=0.9,
+            lr=self.args['init_lr'],
+            weight_decay=self.args['init_weight_decay'],
+        )
+        scheduler = optim.lr_scheduler.MultiStepLR(
           optimizer=optimizer, milestones=self.args['init_milestones'],
           gamma=self.args['init_lr_decay']
       )
+      elif self.args["optimizer"] == "ours":
+        optimizer = quant.QuantMomentumOptimizer(
+            self._network.parameters(),
+            momentum=0.9,
+            lr=self.args['init_lr'],
+            )
+        # never use 
+        scheduler = optim.lr_scheduler.StepLR(
+          optimizer=optimizer, step_size=1e32, gamma=1
+          )
+      else:
+        raise NotImplementedError
+      
       if self.args['skip']:
         if len(self._multiple_gpus) > 1:
           self._network = self._network.module
@@ -100,16 +114,29 @@ class LwF(BaseLearner):
       else:
         self._init_train(train_loader, test_loader, optimizer, scheduler)
     else:
-      optimizer = optim.SGD(
-          self._network.parameters(),
-          lr=self.args['lr'],
-          momentum=0.9,
-          weight_decay=self.args['weight_decay'],
+      if self.args["optimizer"] == "sgd":
+        optimizer = optim.SGD(
+            self._network.parameters(),
+            momentum=0.9,
+            lr=self.args['init_lr'],
+            weight_decay=self.args['init_weight_decay'],
+        )
+        scheduler = optim.lr_scheduler.MultiStepLR(
+          optimizer=optimizer, milestones=self.args['init_milestones'],
+          gamma=self.args['init_lr_decay']
       )
-      scheduler = optim.lr_scheduler.MultiStepLR(
-          optimizer=optimizer, milestones=self.args['milestones'],
-          gamma=self.args['lr_decay']
-      )
+      elif self.args["optimizer"] == "ours":
+        optimizer = quant.QuantMomentumOptimizer(
+            self._network.parameters(),
+            momentum=0.9,
+            lr=self.args['init_lr'],
+            )
+        # never use 
+        scheduler = optim.lr_scheduler.StepLR(
+          optimizer=optimizer, step_size=1e32, gamma=1
+          )
+      else:
+        raise NotImplementedError
       self._update_representation(
           train_loader, test_loader, optimizer, scheduler)
 

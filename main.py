@@ -97,6 +97,8 @@ def setup_parser():
   parser.add_argument('--model_name', '-model', type=str,
                       default=None, required=True)
   parser.add_argument('--model_type', '-net', type=str, default='resnet32')
+  parser.add_argument('--optimizer', '-opt', type=str, default='sgd', 
+                      choices=['sgd', 'ours'])
   parser.add_argument('--prefix', '-p', type=str, help='exp type',
                       default='benchmark', choices=['benchmark', 'fair',
                                                     'auc'])

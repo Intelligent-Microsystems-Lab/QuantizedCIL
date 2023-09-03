@@ -205,12 +205,29 @@ class BiC(BaseLearner):
             "weight_decay": 0,
         },
     ]
-    optimizer = optim.SGD(
-        network_params, lr=self.args['lr'], momentum=0.9, weight_decay=self.args['weight_decay']
+    if self.args["optimizer"] == "sgd":
+      optimizer = optim.SGD(
+          self._network.parameters(),
+          momentum=0.9,
+          lr=self.args['init_lr'],
+          weight_decay=self.args['init_weight_decay'],
+      )
+      scheduler = optim.lr_scheduler.MultiStepLR(
+        optimizer=optimizer, milestones=self.args['init_milestones'],
+        gamma=self.args['init_lr_decay']
     )
-    scheduler = optim.lr_scheduler.MultiStepLR(
-        optimizer=optimizer, milestones=self.args['milestones'], gamma=self.args['lr_decay']
-    )
+    elif self.args["optimizer"] == "ours":
+      optimizer = quant.QuantMomentumOptimizer(
+          self._network.parameters(),
+          momentum=0.9,
+          lr=self.args['init_lr'],
+          )
+      # never use 
+      scheduler = optim.lr_scheduler.StepLR(
+        optimizer=optimizer, step_size=1e32, gamma=1
+        )
+    else:
+      raise NotImplementedError
 
     if len(self._multiple_gpus) > 1:
       self._network = nn.DataParallel(self._network, self._multiple_gpus)
@@ -241,12 +258,29 @@ class BiC(BaseLearner):
             "weight_decay": self.args['weight_decay'],
         }
     ]
-    optimizer = optim.SGD(
-        network_params, lr=self.args['lr'], momentum=0.9, weight_decay=self.args['weight_decay']
+    if self.args["optimizer"] == "sgd":
+      optimizer = optim.SGD(
+          self._network.parameters(),
+          momentum=0.9,
+          lr=self.args['lr'],
+          weight_decay=self.args['weight_decay'],
+      )
+      scheduler = optim.lr_scheduler.MultiStepLR(
+        optimizer=optimizer, milestones=self.args['milestones'],
+        gamma=self.args['lr_decay']
     )
-    scheduler = optim.lr_scheduler.MultiStepLR(
-        optimizer=optimizer, milestones=self.args['milestones'], gamma=self.args['lr_decay']
-    )
+    elif self.args["optimizer"] == "ours":
+      optimizer = quant.QuantMomentumOptimizer(
+          self._network.parameters(),
+          momentum=0.9,
+          lr=self.args['lr'],
+          )
+      # never use 
+      scheduler = optim.lr_scheduler.StepLR(
+        optimizer=optimizer, step_size=1e32, gamma=1
+        )
+    else:
+      raise NotImplementedError
 
     if len(self._multiple_gpus) > 1:
       self._network = nn.DataParallel(self._network, self._multiple_gpus)
