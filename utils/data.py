@@ -1,4 +1,5 @@
 import numpy as np
+import torch
 from torchvision import datasets, transforms
 from utils.toolkit import split_images_labels
 from utils import har_data
@@ -127,6 +128,32 @@ class iImageNet100(iData):
 
     self.train_data, self.train_targets = split_images_labels(train_dset.imgs)
     self.test_data, self.test_targets = split_images_labels(test_dset.imgs)
+
+
+class iMNIST(iData):
+  use_path = False
+  train_trsf = [
+  ]
+  test_trsf = []
+  common_trsf = [
+      transforms.ToTensor(),
+      transforms.Normalize((0.1307,), (0.3081,)),
+      transforms.Lambda(lambda x: torch.flatten(x))
+  ]
+
+  class_order = np.arange(10).tolist()
+
+  def download_data(self):
+    train_dataset = datasets.mnist.MNIST(
+        "./data", train=True, download=True)
+    test_dataset = datasets.mnist.MNIST(
+        "./data", train=False, download=True)
+    self.train_data, self.train_targets = train_dataset.data, np.array(
+        train_dataset.targets
+    )
+    self.test_data, self.test_targets = test_dataset.data, np.array(
+        test_dataset.targets
+    )
 
 
 class iDSADS(iData):

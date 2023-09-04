@@ -3,7 +3,7 @@ import numpy as np
 from PIL import Image
 from torch.utils.data import Dataset
 from torchvision import transforms
-from utils.data import iCIFAR10, iCIFAR100, iImageNet100, iImageNet1000, iDSADS, iPAMAP, iHAPT, iWISDM
+from utils.data import iCIFAR10, iCIFAR100, iImageNet100, iImageNet1000, iMNIST, iDSADS, iPAMAP, iHAPT, iWISDM
 
 
 
@@ -234,6 +234,8 @@ def _get_idata(dataset_name):
     return iImageNet1000()
   elif name == "imagenet100":
     return iImageNet100()
+  elif name == "mnist":
+    return iMNIST()
   elif name == "dsads":
     return iDSADS()
   elif name == "pamap":
