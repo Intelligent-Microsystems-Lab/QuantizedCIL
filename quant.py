@@ -213,7 +213,7 @@ def place_quant(m, lin_w, lin_b, c_path='',):
             old_sw = None
           setattr(m, attr_str, tmp_meth(in_features=target_attr.in_features,
                                         out_features=target_attr.out_features,
-                                        bias=hasattr(target_attr, 'bias'),
+                                        bias=getattr(target_attr, 'bias') is not None,
                                         uname=c_path + '_' + attr_str,))
           
           if lin_w is not None and attr_str == 'fc':
@@ -628,6 +628,7 @@ class FLinearQ(torch.autograd.Function):
       w_h1, swh1 = dynamic_intQ(w_h1)
     elif quantBWDWgt == 'noq':
       w_h1 = w_h1
+      swh1 = torch.tensor([1.0])
     else:
       raise Exception('Grad rounding scheme not implemented: ' + quantBWDWgt)
 
@@ -643,6 +644,7 @@ class FLinearQ(torch.autograd.Function):
       grad_output_h1, sg1 = dynamic_stoch(grad_output_h1)
     elif quantBWDGrad1 == 'noq':
       grad_output_h1 = grad_output_h1
+      sg1 = torch.tensor([1.0])
     else:
       raise Exception('Grad rounding scheme not implemented: ' + quantBWDGrad1)
 
@@ -658,6 +660,7 @@ class FLinearQ(torch.autograd.Function):
       x_h2, sxh2 = dynamic_intQ(x_h2)
     elif quantBWDAct == 'noq':
       x_h2 = x_h2
+      sxh2 = torch.tensor([1.0])
     elif quantBWDAct == 'stoch':
       x_h2, sxh2 = dynamic_stoch(x_h2)
     else:
@@ -674,12 +677,13 @@ class FLinearQ(torch.autograd.Function):
       grad_output_h2, sg2 = dynamic_stoch(grad_output_h2)
     elif quantBWDGrad2 == 'noq':
       grad_output_h2 = grad_output_h2
+      sg2 = torch.tensor([1.0])
     else:
       raise Exception('Grad rounding scheme not implemented: ' + quantBWDGrad2)
 
     # print(torch.unique(grad_output_h2).shape[0])
 
-    grad_w = (grad_output_h2 @ x_h2) # * 1 / biggest_power2_factor(h_bs.shape[0])
+    grad_w = (grad_output_h2 @ x_h2) * 1 / biggest_power2_factor(h_bs.shape[0])
     n = 2**quantAccBits/2 - 1
     grad_w = torch.clamp(grad_w, -n, n)
 
@@ -775,6 +779,9 @@ class Linear_Ours(nn.Linear):
 
       w_q = self.weight
       sw = self.sw
+    elif quantFWDWgt == 'noq':
+      w_q = self.weight
+      sw = torch.tensor([1.0])
     else:
       raise Exception('FWD weight quantized method not implemented: ' + quantFWDWgt)
 
@@ -794,6 +801,7 @@ class Linear_Ours(nn.Linear):
       qinput = lsq(input, self.lsq_wgt, self.QpA, self.QnA)
     elif quantFWDAct == 'noq':
       qinput = input
+      sa = torch.tensor([1.0])
     else:
       raise Exception('FWD act quantized method not implemented: ' + quantFWDWgt)
 
@@ -804,7 +812,9 @@ class Linear_Ours(nn.Linear):
     else:
       h_bs = self.hadamard_bs
 
-    output = FLinearQ.apply(qinput, w_q, self.hadamard_out, h_bs, sa, sw) + self.bias
+    output = FLinearQ.apply(qinput, w_q, self.hadamard_out, h_bs, sa, sw) 
+    if self.bias is not None:
+      output += self.bias
 
     return {'logits': output}
 
@@ -861,6 +871,9 @@ class Conv2d_Ours(nn.Conv2d):
 
       w_q = self.weight
       sw = self.sw
+    elif quantFWDWgt == 'noq':
+      w_q = self.weight
+      sw = torch.tensor([1.0])
     else:
       raise Exception('FWD weight quantized method not implemented: ' + quantFWDWgt)
 
@@ -879,6 +892,7 @@ class Conv2d_Ours(nn.Conv2d):
       qinput = lsq(input, self.lsq_wgt, self.QpA, self.QnA)
     elif quantFWDAct == 'noq':
       qinput = input
+      sa = torch.tensor([1.0])
     else:
       raise Exception('FWD act quantized method not implemented: ' + quantFWDWgt)
 
@@ -905,7 +919,10 @@ class Conv2d_Ours(nn.Conv2d):
     # reshaping outputs into image form with batch, channel, height, width
     out = out.transpose(1, 2)
     output = out.view((input.shape[0], self.out_channels, int(
-        input.shape[-2] / self.stride[0]), int(input.shape[-1] / self.stride[1]))) + self.bias.view(1, -1, 1, 1)
+        input.shape[-2] / self.stride[0]), int(input.shape[-1] / self.stride[1])))
+
+    if self.bias is not None:
+      output += self.bias.view(1, -1, 1, 1)
 
     # np.testing.assert_allclose(output_cmp.cpu().detach().numpy(), output.cpu().detach().numpy(), rtol=1e-05, atol=1e-2)
 

@@ -19,7 +19,7 @@ class linl(nn.Module):
 
   def __init__(self, in_dim, out_dim, act_fun):
     super().__init__()
-    self.lw = nn.Linear(in_dim, out_dim)
+    self.lw = nn.Linear(in_dim, out_dim, bias=False)
     self.act = get_activation(act_fun)
 
   def forward(self, x):

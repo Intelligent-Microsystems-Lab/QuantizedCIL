@@ -27,7 +27,8 @@ class SimpleLinear(nn.Module):
 
   def reset_parameters(self):
     nn.init.kaiming_uniform_(self.weight, nonlinearity='linear')
-    nn.init.constant_(self.bias, 0)
+    if self.bias is not None:
+      nn.init.constant_(self.bias, 0)
 
   def forward(self, input):
     return {'logits': F.linear(input, self.weight, self.bias)}

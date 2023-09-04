@@ -201,9 +201,11 @@ class IncrementalNet(BaseNet):
     if self.fc is not None:
       nb_output = self.fc.out_features
       weight = copy.deepcopy(self.fc.weight.data)
-      bias = copy.deepcopy(self.fc.bias.data)
       fc.weight.data[:nb_output] = weight
-      fc.bias.data[:nb_output] = bias
+
+      if self.fc.bias is not None:
+        bias = copy.deepcopy(self.fc.bias.data)
+        fc.bias.data[:nb_output] = bias
 
     del self.fc
     self.fc = fc
@@ -219,7 +221,7 @@ class IncrementalNet(BaseNet):
     self.fc.weight.data[-increment:, :] *= gamma
 
   def generate_fc(self, in_dim, out_dim):
-    fc = SimpleLinear(in_dim, out_dim)
+    fc = SimpleLinear(in_dim, out_dim, bias=False)
 
     return fc
 
