@@ -110,6 +110,7 @@ def _train(args):
   quant.quantBWDAct = args["quantBWDAct"]
   quant.quantBWDGrad1 = args["quantBWDGrad1"]
   quant.quantBWDGrad2 = args["quantBWDGrad2"]
+  quant.global_args = args
 
   start_time = time.time()
   logging.info(f"Start time:{start_time}")

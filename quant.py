@@ -160,9 +160,7 @@ def place_track(m, layer_list, c_path, lin_w, lin_b):
 
 
 def place_quant(m, lin_w, lin_b, c_path='',):
-
-  global global_args
-  global_args = m.args
+  
 
   for attr_str in dir(m):
     if attr_str[:1] != '_':
