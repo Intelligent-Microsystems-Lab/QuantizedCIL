@@ -114,7 +114,7 @@ def setup_parser():
   parser.add_argument('--quantizeTrack', action="store_true")
   parser.add_argument('--quantMethod', '-qmethod', type=str,
                       default=None, required=False, choices=['luq', "ibm",
-                                                             'ours'])
+                                                             'ours', 'noq'])
   parser.add_argument('--quantFWDWgt', '-qfwdw', type=str,
                       default=None, required=False, choices=['sawb', "int",
                                                              'lsq', 'noq', 'mem'])

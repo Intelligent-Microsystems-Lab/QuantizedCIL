@@ -46,7 +46,8 @@ class BiC(BaseLearner):
     if quant.quantTrack:
       quant.place_track(self._network, track_layer_list, '', lin_w, lin_b)
     elif quant.quantMethod is not None:
-      quant.place_quant(self._network, lin_w, lin_b)
+      if quant.quantMethod != 'noq':
+        quant.place_quant(self._network, lin_w, lin_b)
     else:
       pass
 
