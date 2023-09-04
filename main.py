@@ -35,6 +35,8 @@ def eval_args(args):
     args.in_dim = 561
   elif args.dataset == "wisdm":
     args.in_dim = 91
+  elif args.dataset == "mnist":
+    args.in_dim = 784
   else:
     #TODO add other datasets
     pass
