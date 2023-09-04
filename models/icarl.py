@@ -24,12 +24,12 @@ grad_quant_bias = {}
 
 torch.autograd.set_detect_anomaly(True)
 
+
 class iCaRL(BaseLearner):
   def __init__(self, args):
     super().__init__(args)
     self._network = IncrementalNet(args["model_type"], False, args=args)
     self.date_str = datetime.now().strftime('%y_%m_%d_%H_%M')
-
 
   def after_task(self):
     self._old_network = self._network.copy().freeze()
@@ -41,13 +41,11 @@ class iCaRL(BaseLearner):
     self._total_classes = self._known_classes + data_manager.get_task_size(
         self._cur_task
     )
-    
 
     self._network.update_fc(self._total_classes)
     logging.info(
         "Learning on {}-{}".format(self._known_classes, self._total_classes)
     )
-
 
     lin_w, lin_b = quant.save_lin_params(self._network)
     if quant.quantTrack:
@@ -119,23 +117,22 @@ class iCaRL(BaseLearner):
             weight_decay=self.args['init_weight_decay'],
         )
         scheduler = optim.lr_scheduler.MultiStepLR(
-          optimizer=optimizer, milestones=self.args['init_milestones'],
-          gamma=self.args['init_lr_decay']
-      )
+            optimizer=optimizer, milestones=self.args['init_milestones'],
+            gamma=self.args['init_lr_decay']
+        )
       elif self.args["optimizer"] == "ours":
         optimizer = quant.QuantMomentumOptimizer(
             self._network.parameters(),
             momentum=0.9,
             lr=self.args['init_lr'],
-            )
+        )
         # never use 
         scheduler = optim.lr_scheduler.StepLR(
-          optimizer=optimizer, step_size=1e32, gamma=1
-          )
+            optimizer=optimizer, step_size=1e32, gamma=1
+        )
       else:
         raise NotImplementedError
-      
-      
+
       self._init_train(train_loader, test_loader, optimizer, scheduler)
     else:
       if self.args["optimizer"] == "sgd":
@@ -146,19 +143,19 @@ class iCaRL(BaseLearner):
             weight_decay=self.args['init_weight_decay'],
         )
         scheduler = optim.lr_scheduler.MultiStepLR(
-          optimizer=optimizer, milestones=self.args['init_milestones'],
-          gamma=self.args['init_lr_decay']
-      )
+            optimizer=optimizer, milestones=self.args['init_milestones'],
+            gamma=self.args['init_lr_decay']
+        )
       elif self.args["optimizer"] == "ours":
         optimizer = quant.QuantMomentumOptimizer(
             self._network.parameters(),
             momentum=0.9,
             lr=self.args['init_lr'],
-            )
+        )
         # never use 
         scheduler = optim.lr_scheduler.StepLR(
-          optimizer=optimizer, step_size=1e32, gamma=1
-          )
+            optimizer=optimizer, step_size=1e32, gamma=1
+        )
       else:
         raise NotImplementedError
       self._update_representation(
@@ -184,9 +181,8 @@ class iCaRL(BaseLearner):
     #     print(n)
     #     print(torch.norm(w))
 
-
   def _init_train(self, train_loader, test_loader, optimizer, scheduler):
-        
+
     prog_bar = tqdm(range(self.args['init_epoch']))
     for i, epoch in enumerate(prog_bar):
 
@@ -200,7 +196,7 @@ class iCaRL(BaseLearner):
       correct, total = 0, 0
       for i, (_, inputs, targets) in enumerate(train_loader):
         inputs, targets = inputs.to(self._device), targets.to(self._device)
-        
+
         # unquantized tracking
         # quant.calibrate_phase = True
         logits = self._network(inputs)["logits"]
@@ -275,7 +271,6 @@ class iCaRL(BaseLearner):
     #   if 'weight' in n:
     #     print(n)
     #     print(torch.norm(w))
-
 
   def _update_representation(self, train_loader, test_loader, optimizer, scheduler):
     prog_bar = tqdm(range(self.args['epochs']))

@@ -198,7 +198,7 @@ def _set_random(seed):
   torch.cuda.manual_seed_all(1)
   torch.backends.cudnn.deterministic = True
   torch.backends.cudnn.benchmark = False
-  
+
 
 def print_args(args):
   for key, value in args.items():

@@ -4,6 +4,7 @@ from torchvision import datasets, transforms
 from utils.toolkit import split_images_labels
 from utils import har_data
 
+
 class iData(object):
   train_trsf = []
   test_trsf = []
@@ -162,16 +163,17 @@ class iDSADS(iData):
 
   def org_data(self):
     train_df, test_df, _, _, _, label_pos, _ = har_data.get_data("dsads", 0.2,
-                                                        delete_class_column=False,
-                                                        user_test_set_size=0)
+                                                                 delete_class_column=False,
+                                                                 user_test_set_size=0)
     features, labels, _ = har_data.get_features_labels_users_from_df(train_df,
-                                                            label_pos,
-                                                            "USER")
+                                                                     label_pos,
+                                                                     "USER")
     test_features, test_labels, _ = har_data.get_features_labels_users_from_df(test_df,
-                                                                      label_pos,
-                                                                      "USER")
+                                                                               label_pos,
+                                                                               "USER")
     self.train_data, self.train_targets = features, labels
     self.test_data, self.test_targets = test_features, test_labels
+
 
 class iPAMAP(iData):
   use_path = False
@@ -179,16 +181,17 @@ class iPAMAP(iData):
 
   def org_data(self):
     train_df, test_df, _, _, _, label_pos, _ = har_data.get_data("pamap", 0.2,
-                                                        delete_class_column=False,
-                                                        user_test_set_size=0)
+                                                                 delete_class_column=False,
+                                                                 user_test_set_size=0)
     features, labels, _ = har_data.get_features_labels_users_from_df(train_df,
-                                                            label_pos,
-                                                            "USER")
+                                                                     label_pos,
+                                                                     "USER")
     test_features, test_labels, _ = har_data.get_features_labels_users_from_df(test_df,
-                                                                      label_pos,
-                                                                      "USER")
+                                                                               label_pos,
+                                                                               "USER")
     self.train_data, self.train_targets = features, labels
     self.test_data, self.test_targets = test_features, test_labels
+
 
 class iHAPT(iData):
   use_path = False
@@ -196,16 +199,17 @@ class iHAPT(iData):
 
   def org_data(self):
     train_df, test_df, _, _, _, label_pos, _ = har_data.get_data("hapt", 0.2,
-                                                        delete_class_column=False,
-                                                        user_test_set_size=0)
+                                                                 delete_class_column=False,
+                                                                 user_test_set_size=0)
     features, labels, _ = har_data.get_features_labels_users_from_df(train_df,
-                                                            label_pos,
-                                                            "USER")
+                                                                     label_pos,
+                                                                     "USER")
     test_features, test_labels, _ = har_data.get_features_labels_users_from_df(test_df,
-                                                                      label_pos,
-                                                                      "USER")
+                                                                               label_pos,
+                                                                               "USER")
     self.train_data, self.train_targets = features, labels
     self.test_data, self.test_targets = test_features, test_labels
+
 
 class iWISDM(iData):
   use_path = False
@@ -213,13 +217,13 @@ class iWISDM(iData):
 
   def org_data(self):
     train_df, test_df, _, _, _, label_pos, _ = har_data.get_data("wisdm", 0.2,
-                                                        delete_class_column=False,
-                                                        user_test_set_size=0)
+                                                                 delete_class_column=False,
+                                                                 user_test_set_size=0)
     features, labels, _ = har_data.get_features_labels_users_from_df(train_df,
-                                                            label_pos,
-                                                            "USER")
+                                                                     label_pos,
+                                                                     "USER")
     test_features, test_labels, _ = har_data.get_features_labels_users_from_df(test_df,
-                                                                      label_pos,
-                                                                       "USER")
+                                                                               label_pos,
+                                                                               "USER")
     self.train_data, self.train_targets = features, labels
     self.test_data, self.test_targets = test_features, test_labels

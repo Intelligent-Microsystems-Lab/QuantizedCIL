@@ -88,7 +88,8 @@ class BaseLearner(object):
       )
     except:
       ret["top{}".format(self.topk)] = np.around(
-          (y_pred.T == np.tile(y_true, (y_pred.T.shape[0], 1))).sum() * 100 / len(y_true),
+          (y_pred.T == np.tile(y_true, (y_pred.T.shape[0], 1))).sum(
+          ) * 100 / len(y_true),
           decimals=2,
       )
     return ret
@@ -164,7 +165,7 @@ class BaseLearner(object):
         ]  # [bs, topk]
       except:
         predicts = torch.topk(
-            outputs, k=outputs.shape[1]-1, dim=1, largest=True, sorted=True
+            outputs, k=outputs.shape[1] - 1, dim=1, largest=True, sorted=True
         )[
             1
         ]  # [bs, topk]
@@ -184,7 +185,8 @@ class BaseLearner(object):
     try:
       return np.argsort(scores, axis=1)[:, : self.topk], y_true  # [N, topk]
     except:
-      return np.argsort(scores, axis=1)[:, : scores.shape[1]-1], y_true  # [N, topk]
+      # [N, topk]
+      return np.argsort(scores, axis=1)[:, : scores.shape[1] - 1], y_true
 
   def _extract_vectors(self, loader):
     self._network.eval()
