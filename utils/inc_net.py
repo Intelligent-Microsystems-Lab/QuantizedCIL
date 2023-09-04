@@ -121,7 +121,7 @@ def get_backbone(backbone_type, pretrained=False, args=None):
   elif name == 'fcnet' and args is not None:
     
     return FCNet(args["in_dim"], args["fc_hid_dim"], args["in_dim"],
-                 args["fc_nr_hid"], "relu")
+                 args["fc_nr_hid"], "relu", args["bias"])
 
   else:
     raise NotImplementedError("Unknown type {}".format(backbone_type))
@@ -132,6 +132,7 @@ class BaseNet(nn.Module):
     super(BaseNet, self).__init__()
     self.backbone = get_backbone(backbone_type, pretrained, args)
     self.fc = None
+    self.args = args
 
   @property
   def feature_dim(self):
@@ -221,7 +222,7 @@ class IncrementalNet(BaseNet):
     self.fc.weight.data[-increment:, :] *= gamma
 
   def generate_fc(self, in_dim, out_dim):
-    fc = SimpleLinear(in_dim, out_dim, bias=False)
+    fc = SimpleLinear(in_dim, out_dim, bias=self.args["bias"])
 
     return fc
 

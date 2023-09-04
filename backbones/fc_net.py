@@ -17,9 +17,9 @@ def get_activation(act_fun):
 
 class linl(nn.Module):
 
-  def __init__(self, in_dim, out_dim, act_fun):
+  def __init__(self, in_dim, out_dim, act_fun, bias):
     super().__init__()
-    self.lw = nn.Linear(in_dim, out_dim, bias=False)
+    self.lw = nn.Linear(in_dim, out_dim, bias=bias)
     self.act = get_activation(act_fun)
 
   def forward(self, x):
@@ -34,27 +34,29 @@ class linl(nn.Module):
 
 class FCNet(nn.Module):
 
-  def __init__(self, in_dim, hid_dim, out_dim, nr_hid_layers, act_fun="relu"):
+  def __init__(self, in_dim, hid_dim, out_dim, nr_hid_layers, act_fun="relu",
+               bias=False):
     super().__init__()
     self.out_dim = out_dim
     self.net = self.make_layers(
-        in_dim, hid_dim, out_dim, nr_hid_layers, act_fun)
+        in_dim, hid_dim, out_dim, nr_hid_layers, act_fun, bias)
 
   def forward(self, x):
     features = self.net(x)
     return {"features": features}
 
-  def make_layers(self, in_dim, hid_dim, out_dim, nr_hid_layers, act_fun="relu"): 
+  def make_layers(self, in_dim, hid_dim, out_dim, nr_hid_layers, act_fun="relu",
+                  bias=False): 
     layers = []
     
-    layer = linl(in_dim, hid_dim, act_fun)
+    layer = linl(in_dim, hid_dim, act_fun, bias)
     layers.append(layer)
 
     for _ in range(nr_hid_layers):
-      layer = linl(hid_dim, hid_dim, act_fun)
+      layer = linl(hid_dim, hid_dim, act_fun, bias)
       layers.append(layer)
     
-    layer = linl(hid_dim, out_dim, act_fun)
+    layer = linl(hid_dim, out_dim, act_fun, bias)
     layers.append(layer)
 
     return nn.Sequential(*layers)
