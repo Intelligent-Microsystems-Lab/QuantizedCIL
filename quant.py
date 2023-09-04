@@ -39,6 +39,7 @@ quantBWDWgt = 'int'
 quantBWDAct = 'int'
 quantBWDGrad1 = "int"
 quantBWDGrad2 = "int"
+global_args = None
 
 QpW = None
 QnW = None
@@ -159,6 +160,10 @@ def place_track(m, layer_list, c_path, lin_w, lin_b):
 
 
 def place_quant(m, lin_w, lin_b, c_path='',):
+
+  global global_args
+  global_args = m.args
+
   for attr_str in dir(m):
     if attr_str[:1] != '_':
       target_attr = getattr(m, attr_str)
@@ -206,7 +211,7 @@ def place_quant(m, lin_w, lin_b, c_path='',):
               if old_sw is None:
                 pass
               else:
-                scale_dyn_range = 2.0
+                scale_dyn_range = global_args["dyn_scale"]
                 lin_w = lin_w/scale_dyn_range
                 lin_w = torch.round(lin_w)
                 m.fc.sw.data = old_sw*scale_dyn_range
@@ -471,9 +476,9 @@ class GradStochasticClippingQ(Function):
     return grad_input, None, None, None, None
 
 
-def dynamic_intQ(x, scale = .975):
+def dynamic_intQ(x):
   # can only be used in BWD - not differentiable
-  mx = x.abs().max() * .975 # torch.quantile(x.abs(), .99) # TODO optimize calibration
+  mx = x.abs().max() * global_args["quantile"] # torch.quantile(x.abs(), .99) # TODO optimize calibration
   scale = mx/(2**(quantBits-1)-1)
   x = torch.clamp(x, -mx, mx)
   return torch.round(x/(scale + 1e-32)), scale # epsilion for vmap # TODO eps size?
@@ -537,7 +542,7 @@ class dynamic_intQ_FWD(Function):
 
   @staticmethod
   def forward(ctx, x):
-    mx = x.abs().max() * .975 # torch.quantile(x.abs(), .99) # TODO optimize calibration
+    mx = x.abs().max() * global_args["quantile"] # torch.quantile(x.abs(), .99) # TODO optimize calibration
     ctx.mx = mx
     ctx.save_for_backward(x)
     if x.min() < 0:
@@ -722,9 +727,9 @@ class Linear_Ours(nn.Linear):
 
     if quantFWDWgt == 'mem':
       if 'backbone' not in uname:
-        scale_dyn_range = 1.1
+        scale_dyn_range = global_args["init_dyn_scale"]
       else:
-        scale_dyn_range = 1.5
+        scale_dyn_range = global_args["dyn_scale"]
 
       # DEBUG!!!!
       # scale_dyn_range = .975
@@ -822,9 +827,9 @@ class Conv2d_Ours(nn.Conv2d):
 
     if quantFWDWgt == 'mem':
       if 'backbone' not in uname:
-        scale_dyn_range = 1.1
+        scale_dyn_range = global_args["init_dyn_scale"]
       else:
-        scale_dyn_range = 1.5
+        scale_dyn_range = global_args["dyn_scale"]
       with torch.no_grad():
 
         mx = self.weight.abs().max() * scale_dyn_range

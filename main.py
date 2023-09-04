@@ -148,6 +148,11 @@ def setup_parser():
   parser.add_argument('--fc_hid_dim', type=int, default=100)
   parser.add_argument('--fc_nr_hid', type=int, default=0)
 
+  # hyperparameter tuning
+  parser.add_argument('--init_dyn_scale', type=float, default=1.1)
+  parser.add_argument('--dyn_scale', type=float, default=2.0)
+  parser.add_argument('--quantile', type=float, default=0.975)
+
   return parser
 
 
