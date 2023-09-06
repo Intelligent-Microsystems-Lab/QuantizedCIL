@@ -197,16 +197,18 @@ class iCaRL(BaseLearner):
     prog_bar = tqdm(range(self.args['init_epoch']))
     for i, epoch in enumerate(prog_bar):
 
-      if i == 0:
-        self._network.to('cpu')
-        self._device = 'cpu'
-        optimizer.load_state_dict(optimizer.state_dict())
+      # set quant scale update
+      if i % args["quantUpdateP"] == 0 and i > 0:
+        quant.quantUpdateScalePhase = True
+      else:
+        quant.quantUpdateScalePhase = False
 
       self._network.train()
       losses = 0.0
       correct, total = 0, 0
       for i, (_, inputs, targets) in enumerate(train_loader):
         inputs, targets = inputs.to(self._device), targets.to(self._device)
+
 
         # unquantized tracking
         # quant.calibrate_phase = True
@@ -277,6 +279,10 @@ class iCaRL(BaseLearner):
       scheduler.step()
       prog_bar.set_description(info)
 
+      # only update scale in one epoch
+      if quant.quantUpdateScalePhase:
+        quant.quantUpdateScalePhase = False
+
     logging.info(info)
     # print('init_train')
     # for n,w in self._network.named_parameters():
@@ -287,6 +293,13 @@ class iCaRL(BaseLearner):
   def _update_representation(self, train_loader, test_loader, optimizer, scheduler):
     prog_bar = tqdm(range(self.args['epochs']))
     for _, epoch in enumerate(prog_bar):
+
+      # set quant scale update
+      if i % args["quantUpdateP"] == 0 and i > 0:
+        quant.quantUpdateScalePhase = True
+      else:
+        quant.quantUpdateScalePhase = False
+
       self._network.train()
       losses = 0.0
       correct, total = 0, 0
@@ -348,6 +361,11 @@ class iCaRL(BaseLearner):
         )
       scheduler.step()
       prog_bar.set_description(info)
+
+      # only update scale in one epoch 
+      if quant.quantUpdateScalePhase:
+        quant.quantUpdateScalePhase = False
+
     logging.info(info)
 
 

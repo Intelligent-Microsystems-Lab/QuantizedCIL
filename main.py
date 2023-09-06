@@ -134,6 +134,8 @@ def setup_parser():
   parser.add_argument('--quantBWDGrad2', '-qbwdg2', type=str, default="int",
                       required=False, choices=['stoch', 'sq', 'int', 'noq'])
   parser.add_argument('--quantBlockSize', type=int, default=32)
+  parser.add_argument('--quantUpdateP', '-qUP', type=int, default=5)
+
   # training parameters
   parser.add_argument('--init_epoch', type=int, default=170)
   parser.add_argument('--init_lr', type=float, default=0.05)

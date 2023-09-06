@@ -42,6 +42,7 @@ quantBWDAct = 'int'
 quantBWDGrad1 = "int"
 quantBWDGrad2 = "int"
 quantBlockSize = 32
+quantUpdateScalePhase = False
 global_args = None
 
 current_uname = ''
@@ -53,7 +54,7 @@ QnA = None
 
 quantGradMxScale = 1.
 
-scale_library = {'a': {}, 'w': {}, 'g': {}}
+scale_library = {}
 
 
 class QuantMomentumOptimizer(torch.optim.Optimizer):
@@ -91,6 +92,11 @@ class QuantMomentumOptimizer(torch.optim.Optimizer):
           p.data = torch.clip(
               p.data, -(2**(quantWgtStoreBits - 1) - 1), (2**(quantWgtStoreBits - 1) - 1))
           p.data = torch.round(p.data)
+
+          global quantUpdateScalePhase
+          global scale_library
+          if quantUpdateScalePhase:
+            if scale_library
 
           # backup == p.data
           # print(torch.abs(backup - p.data).max())
@@ -632,6 +638,14 @@ class FLinearQ(torch.autograd.Function):
       # requantize to acc BW (clamp to big values - no scale)
       n = 2**quantAccBits / 2 - 1
       output = torch.clamp(output, -n, n)
+
+      if quantUpdateScalePhase:
+        global scale_library
+        global current_uname
+        scale_library[current_uname] = (int(torch.sum(output == 0.))/np.prod(output.shape),
+                                        max(int(torch.sum(output == n))/np.prod(output.shape),
+                                            int(torch.sum(output == -n))/np.prod(output.shape)))
+
 
       # if current_uname in track_stats['zeros']:
       #   track_stats['zeros'][current_uname].append(int(torch.sum(output == 0.))/np.prod(output.shape))
