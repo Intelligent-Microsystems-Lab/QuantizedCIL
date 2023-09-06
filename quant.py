@@ -39,6 +39,7 @@ quantBWDWgt = 'int'
 quantBWDAct = 'int'
 quantBWDGrad1 = "int"
 quantBWDGrad2 = "int"
+quantBlockSize = 32
 global_args = None
 
 QpW = None
