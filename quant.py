@@ -23,7 +23,8 @@ from hadamard import make_hadamard, biggest_power2_factor
 
 
 track_stats = {'grads': {}, 'acts': {}, 'wgts': {},
-               'grad_stats': {}, 'test_acc': [], 'train_acc': [], 'loss': []}
+               'grad_stats': {}, 'test_acc': [], 'train_acc': [], 'loss': [],
+               'zeros': {}, 'maxv':{}}
 calibrate_phase = False
 quantizeFwd = False
 quantizeBwd = False
@@ -42,6 +43,8 @@ quantBWDGrad1 = "int"
 quantBWDGrad2 = "int"
 quantBlockSize = 32
 global_args = None
+
+current_uname = ''
 
 QpW = None
 QnW = None
@@ -227,9 +230,9 @@ def place_quant(m, lin_w, lin_b, c_path='',):
               else:
                 scale_dyn_range = global_args["dyn_scale"]
                 # TODO possibly critical!
-                lin_w = lin_w / scale_dyn_range
-                lin_w = torch.round(lin_w)
-                m.fc.sw.data = old_sw * scale_dyn_range
+                # lin_w = lin_w / scale_dyn_range
+                # lin_w = torch.round(lin_w)
+                # m.fc.sw.data = old_sw * scale_dyn_range
                 m.fc.weight.data = lin_w
             else:
               m.fc.weight.data = lin_w
@@ -629,11 +632,23 @@ class FLinearQ(torch.autograd.Function):
       # requantize to acc BW (clamp to big values - no scale)
       n = 2**quantAccBits / 2 - 1
       output = torch.clamp(output, -n, n)
+
+      # if current_uname in track_stats['zeros']:
+      #   track_stats['zeros'][current_uname].append(int(torch.sum(output == 0.))/np.prod(output.shape))
+      # else:
+      #   track_stats['zeros'][current_uname] = [int(torch.sum(output == 0.))/np.prod(output.shape)]
+
+      # if current_uname in track_stats['maxv']:
+      #   track_stats['maxv'][current_uname].append(max(int(torch.sum(output == n))/np.prod(output.shape), int(torch.sum(output == -n))/np.prod(output.shape)))
+      # else:
+      #   track_stats['maxv'][current_uname] = [max(int(torch.sum(output == n))/np.prod(output.shape) , int(torch.sum(output == -n))/np.prod(output.shape))]
+
       fin_output += output
 
     # fin_output = F.linear(x, w)
     # n = 2**quantAccBits / 2 - 1
     # fin_output = torch.clamp(fin_output, -n, n)
+
 
     return fin_output * sw * sx
 
@@ -769,10 +784,10 @@ class Linear_Ours(nn.Linear):
     #     [self.weight.abs().mean() * 2 / np.sqrt(self.QpW)], dtype=torch.float32))
 
     if quantFWDWgt == 'mem':
-      if 'backbone' not in uname:
-        scale_dyn_range = global_args["init_dyn_scale"]
-      else:
-        scale_dyn_range = global_args["dyn_scale"]
+      # if 'backbone' not in uname:
+      #   scale_dyn_range = global_args["init_dyn_scale"]
+      # else:
+      scale_dyn_range = global_args["dyn_scale"]
 
       # DEBUG!!!!
       # scale_dyn_range = .975
@@ -855,6 +870,9 @@ class Linear_Ours(nn.Linear):
     else:
       h_bs = self.hadamard_bs
 
+    global current_uname
+    current_uname = self.uname
+
     output = FLinearQ.apply(qinput, w_q, self.hadamard_out, h_bs, sa, sw) 
     if self.bias is not None:
       output += self.bias
@@ -880,10 +898,10 @@ class Conv2d_Ours(nn.Conv2d):
     #     [self.weight.abs().mean() * 2 / np.sqrt(self.QpW)], dtype=torch.float32))
 
     if quantFWDWgt == 'mem':
-      if 'backbone' not in uname:
-        scale_dyn_range = global_args["init_dyn_scale"]
-      else:
-        scale_dyn_range = global_args["dyn_scale"]
+      # if 'backbone' not in uname:
+      #   scale_dyn_range = global_args["init_dyn_scale"]
+      # else:
+      scale_dyn_range = global_args["dyn_scale"]
       with torch.no_grad():
 
         mx = self.weight.abs().max() * scale_dyn_range

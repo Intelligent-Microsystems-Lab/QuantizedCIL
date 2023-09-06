@@ -179,6 +179,13 @@ class iCaRL(BaseLearner):
             np.save('track_stats/' + self.date_str + '_' + self.args['dataset'] + '_' + self.args['model_name'] + '_' + str(
                 self._cur_task) + lname + '_' + stat_name + '.npy', torch.hstack(quant.track_stats['grad_stats'][lname][stat_name]).numpy())
 
+    # # import pdb; pdb.set_trace()
+    # for lname in ['_backbone_net_0_lw', '_backbone_net_1_lw', '_fc']:
+    #   for stat_name in ['zeros', 'maxv']:
+    #     np.save('track_stats/' + self.date_str + '_' + self.args['dataset'] + '_' + self.args['model_name'] + '_' + str(
+    #         self._cur_task) + lname + '_' + stat_name + '.npy', np.array(quant.track_stats[stat_name][lname]))
+    #     quant.track_stats[stat_name][lname] = []
+
     # print('train')
     # for n,w in self._network.named_parameters():
     #   if 'weight' in n:
