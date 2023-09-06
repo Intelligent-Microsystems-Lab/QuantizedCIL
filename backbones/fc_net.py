@@ -23,14 +23,15 @@ class linl(nn.Module):
     self.act = get_activation(act_fun)
 
   def forward(self, x):
-    
+
     x = self.lw(x)
-    
+
     # TODO: no if block
     if type(x) is dict:
       x = x['logits']
 
     return self.act(x)
+
 
 class FCNet(nn.Module):
 
@@ -46,9 +47,9 @@ class FCNet(nn.Module):
     return {"features": features}
 
   def make_layers(self, in_dim, hid_dim, out_dim, nr_hid_layers, act_fun="relu",
-                  bias=False): 
+                  bias=False, half_dims=False): 
     layers = []
-    
+
     layer = linl(in_dim, hid_dim, act_fun, bias)
     layers.append(layer)
 

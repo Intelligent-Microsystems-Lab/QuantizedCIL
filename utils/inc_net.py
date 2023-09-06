@@ -119,7 +119,7 @@ def get_backbone(backbone_type, pretrained=False, args=None):
     g_blcoks, s_blocks = memo_resnet50_imagenet()
     return g_blcoks, s_blocks
   elif name == 'fcnet' and args is not None:
-    
+
     return FCNet(args["in_dim"], args["fc_hid_dim"], args["in_dim"],
                  args["fc_nr_hid"], "relu", args["bias"], args["half_dims"])
 
@@ -188,6 +188,7 @@ class BaseNet(nn.Module):
     self.fc.load_state_dict(model_infos['fc'])
     test_acc = model_infos['test_acc']
     return test_acc
+
 
 class IncrementalNet(BaseNet):
   def __init__(self, backbone_type, pretrained, gradcam=False, args=None):

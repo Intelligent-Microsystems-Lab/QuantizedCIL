@@ -307,7 +307,7 @@ class Linear_LUQ(nn.Linear):
 
   def forward(self, input):
 
-    if False: # self.quantizeFwd:
+    if False:  # self.quantizeFwd:
 
       w_q = UniformQuantizeSawb.apply(
           self.weight, self.c1, self.c2, self.QpW, self.QnW)
@@ -340,7 +340,7 @@ class Conv2d_LUQ(nn.Conv2d):
 
   def forward(self, input):
 
-    if False: # self.quantizeFwd:
+    if False:  # self.quantizeFwd:
       w_q = UniformQuantizeSawb.apply(
           self.weight, self.c1, self.c2, self.QpW, self.QnW)
 
@@ -425,22 +425,23 @@ class GradStochasticClippingQ(Function):
     return grad_input, None, None, None, None
 
 
-def dynamic_intQ(x, scale = .975):
+def dynamic_intQ(x, scale=.975):
   # can only be used in BWD - not differentiable
-  mx = x.abs().max() * .975 # torch.quantile(x.abs(), .99) # TODO optimize calibration
-  scale = mx/(2**(quantBits-1)-1)
+  mx = x.abs().max() * .975  # torch.quantile(x.abs(), .99) # TODO optimize calibration
+  scale = mx / (2**(quantBits - 1) - 1)
   x = torch.clamp(x, -mx, mx)
-  return torch.round(x/(scale + 1e-32)), scale # epsilion for vmap # TODO eps size?
+  # epsilion for vmap # TODO eps size?
+  return torch.round(x / (scale + 1e-32)), scale
 
 
-def dynamic_squant(x, scale = 1):
+def dynamic_squant(x, scale=1):
   dim = x.shape
   x = x.flatten()
 
-  mx = x.abs().max() * scale # torch.quantile(x.abs(), .99) # TODO optimize calibration
-  scale = mx/(2**(quantBits-1)-1)
+  mx = x.abs().max() * scale  # torch.quantile(x.abs(), .99) # TODO optimize calibration
+  scale = mx / (2**(quantBits - 1) - 1)
 
-  x_clamp = torch.clamp(x, -mx, mx)/(scale + 1e-32)
+  x_clamp = torch.clamp(x, -mx, mx) / (scale + 1e-32)
   xq = torch.round(x_clamp)
 
   xq_down = xq - 1
@@ -450,30 +451,34 @@ def dynamic_squant(x, scale = 1):
 
   # bias meaning positive too much round up
   bias = qe.sum().floor()
-  bias_use = torch.where(bias.abs() -1 <= 0, torch.tensor([1], device=x.device), bias)
+  bias_use = torch.where(
+      bias.abs() - 1 <= 0, torch.tensor([1], device=x.device), bias)
 
-  qe_cutoff_pos = torch.gather(torch.sort(qe, descending = True).values, 0, bias_use.abs().type(torch.int64) -1)
+  qe_cutoff_pos = torch.gather(torch.sort(
+      qe, descending=True).values, 0, bias_use.abs().type(torch.int64) - 1)
   xq_pos = torch.where(qe < qe_cutoff_pos, xq, xq_down)
 
-  qe_cutoff_neg = torch.gather(torch.sort(-qe, descending = True).values, 0, bias_use.abs().type(torch.int64) -1)
+  qe_cutoff_neg = torch.gather(
+      torch.sort(-qe, descending=True).values, 0, bias_use.abs().type(torch.int64) - 1)
   xq_neg = torch.where(-qe < qe_cutoff_neg, xq, xq_up)
 
   xqt = torch.where(bias > 0, xq_pos, xq_neg)
-  xq = torch.where(bias.abs()-1 <= 0, xq, xqt)
+  xq = torch.where(bias.abs() - 1 <= 0, xq, xqt)
 
   # assert torch.unique(xq).shape[0] < 9
 
   xq = torch.reshape(xq, dim)
   return xq * scale
 
-def dynamic_stoch(x, scale = 1):
+
+def dynamic_stoch(x, scale=1):
   # can only be used in BWD - not differentiable
   dim = x.shape
   x = x.flatten()
 
-  mx = x.abs().max() * scale # torch.quantile(x.abs(), .99) # TODO optimize calibration
-  scale = mx/(2**(quantBits-1)-1)
-  x = torch.clamp(x, -mx, mx)/(scale + 1e-32)
+  mx = x.abs().max() * scale  # torch.quantile(x.abs(), .99) # TODO optimize calibration
+  scale = mx / (2**(quantBits - 1) - 1)
+  x = torch.clamp(x, -mx, mx) / (scale + 1e-32)
 
   sign = torch.sign(x)
   xq_ord = torch.floor(x.abs())
@@ -487,21 +492,22 @@ def dynamic_stoch(x, scale = 1):
   xq = torch.reshape(sign * xq, dim)
   return xq * scale
 
+
 class dynamic_intQ_FWD(Function):
 
   @staticmethod
   def forward(ctx, x):
-    mx = x.abs().max() * .975 # torch.quantile(x.abs(), .99) # TODO optimize calibration
+    mx = x.abs().max() * .975  # torch.quantile(x.abs(), .99) # TODO optimize calibration
     ctx.mx = mx
     ctx.save_for_backward(x)
     if x.min() < 0:
-      scale = mx/(2**(quantBits-1)-1)
+      scale = mx / (2**(quantBits - 1) - 1)
       x = torch.clamp(x, -mx, mx)
     else:
-      scale =  mx/(2**(quantBits)-1)
+      scale = mx / (2**(quantBits) - 1)
       x = torch.clamp(x, 0, mx)
-    
-    return torch.round(x/scale), scale
+
+    return torch.round(x / scale), scale
 
   @staticmethod
   def backward(ctx, grad_output):
@@ -510,11 +516,14 @@ class dynamic_intQ_FWD(Function):
 
     # TODO local scale reconsideration
     # local_mx = ctx.mx
-    local_mx = (2**(quantBits-1)-1)
+    local_mx = (2**(quantBits - 1) - 1)
 
-    grad_output = torch.where(x>local_mx, torch.tensor([0], dtype=x.dtype, device=x.device), grad_output)
-    grad_output = torch.where(x<-local_mx, torch.tensor([0], dtype=x.dtype, device=x.device), grad_output)
+    grad_output = torch.where(x > local_mx, torch.tensor(
+        [0], dtype=x.dtype, device=x.device), grad_output)
+    grad_output = torch.where(
+        x < -local_mx, torch.tensor([0], dtype=x.dtype, device=x.device), grad_output)
     return grad_output, None
+
 
 def SAWB(input, c1, c2, Qp, Qn):
   output = input.clone()
@@ -529,6 +538,7 @@ def SAWB(input, c1, c2, Qp, Qn):
 
   return output
 
+
 class FLinearQ(torch.autograd.Function):
   generate_vmap_rule = True
 
@@ -538,14 +548,15 @@ class FLinearQ(torch.autograd.Function):
     output = F.linear(x, w)
 
     # requantize to int16 (clamp to big values - no scale)
-    n = 2**16/2 - 1
+    n = 2**16 / 2 - 1
     output = torch.clamp(output, -n, n)
 
     return output * sw * sx
 
   @staticmethod
   def setup_context(ctx, inputs, output):
-    ctx.save_for_backward(inputs[0], inputs[1], inputs[2], inputs[3], inputs[4], inputs[5])
+    ctx.save_for_backward(inputs[0], inputs[1],
+                          inputs[2], inputs[3], inputs[4], inputs[5])
 
   @staticmethod
   def backward(ctx, grad_output):
@@ -561,7 +572,6 @@ class FLinearQ(torch.autograd.Function):
       w_h1 = w_h1
     else:
       raise Exception('Grad rounding scheme not implemented: ' + quantBWDWgt)
-
 
     grad_output_h1 = grad_output @ h_out
     # quant grad_output
@@ -580,7 +590,8 @@ class FLinearQ(torch.autograd.Function):
 
     # print(torch.unique(grad_output_h1).shape[0])
     # TODO biggest power of two can be optimized
-    grad_input = (grad_output_h1 @ w_h1) * 1 / biggest_power2_factor(h_out.shape[0])
+    grad_input = (grad_output_h1 @ w_h1) * 1 / \
+        biggest_power2_factor(h_out.shape[0])
 
     x_h2 = h_bs @ x
     # requantize acts
@@ -613,7 +624,8 @@ class FLinearQ(torch.autograd.Function):
 
     grad_w = (grad_output_h2 @ x_h2) * 1 / biggest_power2_factor(h_bs.shape[0])
 
-    import pdb; pdb.set_trace()
+    import pdb
+    pdb.set_trace()
     return grad_input * sg1 * swh1 * sw, grad_w * sg2 * sxh2 * sx, None, None, None, None
 
 
@@ -668,15 +680,15 @@ class Linear_Ours(nn.Linear):
     if quantFWDWgt == 'sawb':
       raise Exception('not implemented')
       w_q = UniformQuantizeSawb.apply(
-            self.weight, self.c1, self.c2, self.QpW, self.QnW)
+          self.weight, self.c1, self.c2, self.QpW, self.QnW)
     elif quantFWDWgt == 'int':
       w_q, sq = dynamic_intQ_FWD.apply(self.weight)
     elif quantFWDWgt == 'lsq':
       raise Exception('not implemented')
       w_q = lsq(self.weight, self.lsq_wgt, self.QpW, self.QnW)
     else:
-      raise Exception('FWD weight quantized method not implemented: ' + quantFWDWgt)
-
+      raise Exception(
+          'FWD weight quantized method not implemented: ' + quantFWDWgt)
 
     if torch.min(input) < 0:
       self.QnA = -2 ** (self.abits - 1) + 1
@@ -685,7 +697,7 @@ class Linear_Ours(nn.Linear):
     if quantFWDAct == 'sawb':
       raise Exception('not implemented')
       qinput = UniformQuantizeSawb.apply(
-            input, self.c1, self.c2, self.QpA, self.QnA)
+          input, self.c1, self.c2, self.QpA, self.QnA)
     elif quantFWDAct == 'int':
       qinput, sa = dynamic_intQ_FWD.apply(input)
     elif quantFWDAct == 'lsq':
@@ -694,7 +706,8 @@ class Linear_Ours(nn.Linear):
     elif quantFWDAct == 'noq':
       qinput = input
     else:
-      raise Exception('FWD act quantized method not implemented: ' + quantFWDWgt)
+      raise Exception(
+          'FWD act quantized method not implemented: ' + quantFWDWgt)
 
     # TODO: optimize speed of hadamard creation
     if input.shape[0] != quantBatchSize:
@@ -703,7 +716,8 @@ class Linear_Ours(nn.Linear):
     else:
       h_bs = self.hadamard_bs
 
-    output = FLinearQ.apply(qinput, w_q, self.hadamard_out, h_bs, sa, sw) + self.bias
+    output = FLinearQ.apply(
+        qinput, w_q, self.hadamard_out, h_bs, sa, sw) + self.bias
 
     # else:
     #   output = F.linear(input, self.weight, self.bias)
@@ -734,14 +748,15 @@ class Conv2d_Ours(nn.Conv2d):
     if quantFWDWgt == 'sawb':
       raise Exception('not implemented')
       w_q = UniformQuantizeSawb.apply(
-            self.weight, self.c1, self.c2, self.QpW, self.QnW)
+          self.weight, self.c1, self.c2, self.QpW, self.QnW)
     elif quantFWDWgt == 'int':
       w_q, sq = dynamic_intQ_FWD.apply(self.weight)
     elif quantFWDWgt == 'lsq':
       raise Exception('not implemented')
       w_q = lsq(self.weight, self.lsq_wgt, self.QpW, self.QnW)
     else:
-      raise Exception('FWD weight quantized method not implemented: ' + quantFWDWgt)
+      raise Exception(
+          'FWD weight quantized method not implemented: ' + quantFWDWgt)
 
     if torch.min(input) < 0:
       self.QnA = -2 ** (self.abits - 1) + 1
@@ -750,7 +765,7 @@ class Conv2d_Ours(nn.Conv2d):
     if quantFWDAct == 'sawb':
       raise Exception('not implemented')
       qinput = UniformQuantizeSawb.apply(
-            input, self.c1, self.c2, self.QpA, self.QnA)
+          input, self.c1, self.c2, self.QpA, self.QnA)
     elif quantFWDAct == 'int':
       qinput, sa = dynamic_intQ_FWD.apply(input)
     elif quantFWDAct == 'lsq':
@@ -759,7 +774,8 @@ class Conv2d_Ours(nn.Conv2d):
     elif quantFWDAct == 'noq':
       qinput = input
     else:
-      raise Exception('FWD act quantized method not implemented: ' + quantFWDWgt)
+      raise Exception(
+          'FWD act quantized method not implemented: ' + quantFWDWgt)
 
     # TODO: optimize speed of hadamard creation
 
@@ -771,10 +787,10 @@ class Conv2d_Ours(nn.Conv2d):
       self.hadamard_bs = torch.tensor(make_hadamard(
           qinput.shape[1]), dtype=self.weight.dtype).to(self.weight.device)
 
-    flinearq_fn = torch.vmap(FLinearQ.apply, randomness = 'different')
+    flinearq_fn = torch.vmap(FLinearQ.apply, randomness='different')
     out = flinearq_fn(qinput, w_q.T.unsqueeze(0).repeat(qinput.shape[0], 1, 1), self.hadamard_out.unsqueeze(
         0).repeat(qinput.shape[0], 1, 1), self.hadamard_bs.unsqueeze(0).repeat(qinput.shape[0], 1, 1),
-    sa.unsqueeze(0).repeat(qinput.shape[0], 1, 1), sw.unsqueeze(0).repeat(qinput.shape[0], 1, 1))
+        sa.unsqueeze(0).repeat(qinput.shape[0], 1, 1), sw.unsqueeze(0).repeat(qinput.shape[0], 1, 1))
 
     # out = []
     # for i in range(qinput.shape[0]):

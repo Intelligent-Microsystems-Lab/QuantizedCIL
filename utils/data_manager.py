@@ -6,7 +6,6 @@ from torchvision import transforms
 from utils.data import iCIFAR10, iCIFAR100, iImageNet100, iImageNet1000, iMNIST, iDSADS, iPAMAP, iHAPT, iWISDM
 
 
-
 class DataManager(object):
   def __init__(self, dataset_name, shuffle, seed, init_cls, increment):
     self.dataset_name = dataset_name

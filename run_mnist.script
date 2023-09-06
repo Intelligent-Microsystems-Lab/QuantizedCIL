@@ -1,0 +1,12 @@
+#!/bin/bash
+#$ -M cschaef6@nd.edu 
+#$ -m abe
+#$ -q gpu@@joshi
+#$ -l gpu_card=1
+
+module load python
+export LD_LIBRARY_PATH=/afs/crc.nd.edu/user/c/cschaef6/.local/lib/cuda-12.1/lib64/:$LD_LIBRARY_PATH
+export LD_LIBRARY_PATH=/afs/crc.nd.edu/user/c/cschaef6/.local/lib/cudnn-linux-x86_64-8.8.1.3_cuda11-archive/lib:$LD_LIBRARY_PATH
+export LD_LIBRARY_PATH=/afs/crc.nd.edu/user/c/cschaef6/.local/lib/nccl_2.17.1-1+cuda11.0_x86_64/lib:$LD_LIBRARY_PATH
+
+python3 main.py -model icarl -init 2 -incre 2 -p benchmark -seed 42 --dataset="mnist" --memory_size=500 --bias=False --model_type="fcnet" --epochs=2 --init_epoch=2 --quantMethod="ours" --quantFWDWgt="mem" --quantFWDAct="int" --quantBWDAct="stoch" --quantBWDWgt="int" --quantBWDGrad1="stoch" --quantBWDGrad2="stoch" --init_lr=$1 --lr=$1 --init_dyn_scale=$2 --dyn_scale=$3 --fc_hid_dim=128 --fc_nr_hid=0 --opt='ours'

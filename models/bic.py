@@ -214,19 +214,19 @@ class BiC(BaseLearner):
           weight_decay=self.args['init_weight_decay'],
       )
       scheduler = optim.lr_scheduler.MultiStepLR(
-        optimizer=optimizer, milestones=self.args['init_milestones'],
-        gamma=self.args['init_lr_decay']
-    )
+          optimizer=optimizer, milestones=self.args['init_milestones'],
+          gamma=self.args['init_lr_decay']
+      )
     elif self.args["optimizer"] == "ours":
       optimizer = quant.QuantMomentumOptimizer(
           self._network.parameters(),
           momentum=0.9,
           lr=self.args['init_lr'],
-          )
+      )
       # never use 
       scheduler = optim.lr_scheduler.StepLR(
-        optimizer=optimizer, step_size=1e32, gamma=1
-        )
+          optimizer=optimizer, step_size=1e32, gamma=1
+      )
     else:
       raise NotImplementedError
 
@@ -267,19 +267,19 @@ class BiC(BaseLearner):
           weight_decay=self.args['weight_decay'],
       )
       scheduler = optim.lr_scheduler.MultiStepLR(
-        optimizer=optimizer, milestones=self.args['milestones'],
-        gamma=self.args['lr_decay']
-    )
+          optimizer=optimizer, milestones=self.args['milestones'],
+          gamma=self.args['lr_decay']
+      )
     elif self.args["optimizer"] == "ours":
       optimizer = quant.QuantMomentumOptimizer(
           self._network.parameters(),
           momentum=0.9,
           lr=self.args['lr'],
-          )
+      )
       # never use 
       scheduler = optim.lr_scheduler.StepLR(
-        optimizer=optimizer, step_size=1e32, gamma=1
-        )
+          optimizer=optimizer, step_size=1e32, gamma=1
+      )
     else:
       raise NotImplementedError
 

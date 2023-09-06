@@ -38,7 +38,7 @@ def eval_args(args):
   elif args.dataset == "mnist":
     args.in_dim = 784
   else:
-    #TODO add other datasets
+    # TODO add other datasets
     pass
 
   # prevent arguments conflict
@@ -129,9 +129,9 @@ def setup_parser():
                       default=None, required=False, choices=["int", 'noq'])
   parser.add_argument('--quantBWDAct', '-qbwda', type=str,
                       default=None, required=False, choices=["int", 'noq', 'stoch'])
-  parser.add_argument('--quantBWDGrad1', '-qbwdg1' , type=str, default="int",
+  parser.add_argument('--quantBWDGrad1', '-qbwdg1', type=str, default="int",
                       required=False, choices=['stoch', 'sq', 'int', 'noq'])
-  parser.add_argument('--quantBWDGrad2', '-qbwdg2' , type=str, default="int",
+  parser.add_argument('--quantBWDGrad2', '-qbwdg2', type=str, default="int",
                       required=False, choices=['stoch', 'sq', 'int', 'noq'])
   parser.add_argument('--quantBlockSize', type=int, default=32)
   # training parameters

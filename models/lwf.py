@@ -21,6 +21,7 @@ grad_quant_bias = {}
 
 glob_counter = 0
 
+
 class LwF(BaseLearner):
   def __init__(self, args):
     super().__init__(args)
@@ -87,22 +88,22 @@ class LwF(BaseLearner):
             weight_decay=self.args['init_weight_decay'],
         )
         scheduler = optim.lr_scheduler.MultiStepLR(
-          optimizer=optimizer, milestones=self.args['init_milestones'],
-          gamma=self.args['init_lr_decay']
-      )
+            optimizer=optimizer, milestones=self.args['init_milestones'],
+            gamma=self.args['init_lr_decay']
+        )
       elif self.args["optimizer"] == "ours":
         optimizer = quant.QuantMomentumOptimizer(
             self._network.parameters(),
             momentum=0.9,
             lr=self.args['init_lr'],
-            )
+        )
         # never use 
         scheduler = optim.lr_scheduler.StepLR(
-          optimizer=optimizer, step_size=1e32, gamma=1
-          )
+            optimizer=optimizer, step_size=1e32, gamma=1
+        )
       else:
         raise NotImplementedError
-      
+
       if self.args['skip']:
         if len(self._multiple_gpus) > 1:
           self._network = self._network.module
@@ -123,19 +124,19 @@ class LwF(BaseLearner):
             weight_decay=self.args['init_weight_decay'],
         )
         scheduler = optim.lr_scheduler.MultiStepLR(
-          optimizer=optimizer, milestones=self.args['init_milestones'],
-          gamma=self.args['init_lr_decay']
-      )
+            optimizer=optimizer, milestones=self.args['init_milestones'],
+            gamma=self.args['init_lr_decay']
+        )
       elif self.args["optimizer"] == "ours":
         optimizer = quant.QuantMomentumOptimizer(
             self._network.parameters(),
             momentum=0.9,
             lr=self.args['init_lr'],
-            )
+        )
         # never use 
         scheduler = optim.lr_scheduler.StepLR(
-          optimizer=optimizer, step_size=1e32, gamma=1
-          )
+            optimizer=optimizer, step_size=1e32, gamma=1
+        )
       else:
         raise NotImplementedError
       self._update_representation(
@@ -170,7 +171,6 @@ class LwF(BaseLearner):
         loss = F.cross_entropy(logits, targets)
         optimizer.zero_grad()
         loss.backward()
-
 
         optimizer.step()
         losses += loss.item()
