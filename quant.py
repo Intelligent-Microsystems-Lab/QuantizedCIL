@@ -621,16 +621,20 @@ class FLinearQ(torch.autograd.Function):
       w = torch.clamp(w, -mx, mx)
       w = torch.round(w / (scale + 1e-32))
 
-    output = F.linear(x, w)
 
-    # requantize to int16 (clamp to big values - no scale)
-    n = 2**quantAccBits / 2 - 1
-    output = torch.clamp(output, -n, n)
+    fin_output = torch.zeros((x.shape[0], w.shape[0]))
+    for i in range(int(np.ceil( x.shape[1]/quantBlockSize ))):
+      output = F.linear(x[:,i*quantBlockSize:(i+1)*quantBlockSize], w[:,i*quantBlockSize:(i+1)*quantBlockSize])
+      # requantize to acc BW (clamp to big values - no scale)
+      n = 2**quantAccBits / 2 - 1
+      output = torch.clamp(output, -n, n)
+      fin_output += output
 
-    # if quantPrintStats:
-    #   print(output.max())
+    # fin_output = F.linear(x, w)
+    # n = 2**quantAccBits / 2 - 1
+    # fin_output = torch.clamp(fin_output, -n, n)
 
-    return output * sw * sx
+    return fin_output * sw * sx
 
   @staticmethod
   def setup_context(ctx, inputs, output):
@@ -822,6 +826,16 @@ class Linear_Ours(nn.Linear):
       qinput = UniformQuantizeSawb.apply(
           input, self.c1, self.c2, self.QpA, self.QnA)
     elif quantFWDAct == 'int':
+
+      # qinput, sa = [], []
+      # for i in range(int(np.ceil(input.shape[1]/quantBlockSize))):
+      #   ta, tsa = dynamic_intQ_FWD.apply(input[:,i*quantBlockSize:(i+1)*quantBlockSize])
+      #   qinput.append(ta)
+      #   sa.append(tsa)
+
+      # qinput = torch.cat(qinput, dim=1)
+      # sa = torch.stack(sa)
+      
       qinput, sa = dynamic_intQ_FWD.apply(input)
     elif quantFWDAct == 'lsq':
       raise Exception('not implemented')
