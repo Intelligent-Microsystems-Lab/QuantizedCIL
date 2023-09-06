@@ -226,6 +226,7 @@ def place_quant(m, lin_w, lin_b, c_path='',):
                 pass
               else:
                 scale_dyn_range = global_args["dyn_scale"]
+                # TODO possibly critical!
                 lin_w = lin_w / scale_dyn_range
                 lin_w = torch.round(lin_w)
                 m.fc.sw.data = old_sw * scale_dyn_range
