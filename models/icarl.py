@@ -153,8 +153,12 @@ class iCaRL(BaseLearner):
             lr=self.args['init_lr'],
         )
         # never use 
-        scheduler = optim.lr_scheduler.StepLR(
-            optimizer=optimizer, step_size=1e32, gamma=1
+        # scheduler = optim.lr_scheduler.StepLR(
+        #     optimizer=optimizer, step_size=1e32, gamma=1
+        # )
+        scheduler = optim.lr_scheduler.MultiStepLR(
+            optimizer=optimizer, milestones=self.args['init_milestones'],
+            gamma=self.args['init_lr_decay']
         )
       else:
         raise NotImplementedError
@@ -200,6 +204,7 @@ class iCaRL(BaseLearner):
         # unquantized tracking
         # quant.calibrate_phase = True
         logits = self._network(inputs)["logits"]
+        # import pdb; pdb.set_trace()
         loss = F.cross_entropy(logits, targets)
         optimizer.zero_grad()
         loss.backward()

@@ -5,6 +5,7 @@
 import scipy
 import numpy as np
 import functools
+import copy
 
 import torch
 import torch.nn as nn
@@ -39,6 +40,7 @@ quantBWDWgt = 'int'
 quantBWDAct = 'int'
 quantBWDGrad1 = "int"
 quantBWDGrad2 = "int"
+quantPrintStats = False
 global_args = None
 
 QpW = None
@@ -58,24 +60,38 @@ class QuantMomentumOptimizer(torch.optim.Optimizer):
     super(QuantMomentumOptimizer, self).__init__(params, defaults={'lr': lr})
     self.momentum = momentum
     self.state = dict()
+    self.layer_lr = dict()
     for group in self.param_groups:
       for p in group['params']:
         if p.grad is not None:
           self.state[p] = dict(mom=torch.zeros_like(p.data))
+          self.layer_lr[p] = self.param_groups[0]['lr']
 
   # Step Method
   def step(self):
+    # print('------')
     for group in self.param_groups:
       for p in group['params']:
         if p not in self.state:
           self.state[p] = dict(mom=torch.zeros_like(p.data))
+          self.layer_lr[p] = self.param_groups[0]['lr']
         if p.grad is not None:
 
-          p.data -= group['lr'] * p.grad.data
+          # backup = copy.deepcopy(p.data)
+
+          # if (self.layer_lr[p] * p.grad.data).max() < 1.0:
+          #   self.layer_lr[p] *= 1.1
+          #   # p.data -=  (torch.bernoulli(torch.ones_like(p.data) * .5) * 2 - 1 ) * torch.bernoulli(torch.ones_like(p.data) * .5)
+          # else:
+          p.data -= self.layer_lr[p] * p.grad.data
 
           p.data = torch.clip(
               p.data, -(2**(quantWgtStoreBits - 1) - 1), (2**(quantWgtStoreBits - 1) - 1))
           p.data = torch.round(p.data)
+
+          # backup == p.data
+          # print(torch.abs(backup - p.data).max())
+          # import pdb; pdb.set_trace()
 
 
 def init_properties(obj, uname):
@@ -205,7 +221,6 @@ def place_quant(m, lin_w, lin_b, c_path='',):
                                         uname=c_path + '_' + attr_str,))
 
           if lin_w is not None and attr_str == 'fc':
-
             if quantFWDWgt == 'mem':
               if old_sw is None:
                 pass
@@ -475,10 +490,12 @@ class GradStochasticClippingQ(Function):
     return grad_input, None, None, None, None
 
 
-def dynamic_intQ(x):
+def dynamic_intQ(x, scale=None):
   # can only be used in BWD - not differentiable
   # torch.quantile(x.abs(), .99) # TODO optimize calibration
-  mx = x.abs().max() * global_args["quantile"]
+  if scale is None:
+    scale = global_args["quantile"]
+  mx = x.abs().max() * scale
   scale = mx / (2**(quantBits - 1) - 1)
   x = torch.clamp(x, -mx, mx)
   # epsilion for vmap # TODO eps size?
@@ -610,6 +627,9 @@ class FLinearQ(torch.autograd.Function):
     n = 2**quantAccBits / 2 - 1
     output = torch.clamp(output, -n, n)
 
+    # if quantPrintStats:
+    #   print(output.max())
+
     return output * sw * sx
 
   @staticmethod
@@ -626,7 +646,7 @@ class FLinearQ(torch.autograd.Function):
     w_h1 = h_out @ w
     # requantize weights
     if quantBWDWgt == 'int':
-      w_h1, swh1 = dynamic_intQ(w_h1)
+      w_h1, swh1 = dynamic_intQ(w_h1, scale=1.)
     elif quantBWDWgt == 'noq':
       w_h1 = w_h1
       swh1 = torch.tensor([1.0])
@@ -651,14 +671,17 @@ class FLinearQ(torch.autograd.Function):
     # print(torch.unique(grad_output_h1).shape[0])
     # TODO biggest power of two can be optimized
     grad_input = (grad_output_h1 @ w_h1) 
+
+    # if quantPrintStats:
+    #   print(grad_input.max())
+
     n = 2**quantAccBits / 2 - 1
-    grad_input = torch.clamp(grad_input, -n, n) * 1 / \
-        biggest_power2_factor(h_out.shape[0])
+    grad_input = torch.clamp(grad_input, -n, n)
 
     x_h2 = h_bs @ x
     # requantize acts
     if quantBWDAct == 'int':
-      x_h2, sxh2 = dynamic_intQ(x_h2)
+      x_h2, sxh2 = dynamic_intQ(x_h2, scale=1.)
     elif quantBWDAct == 'noq':
       x_h2 = x_h2
       sxh2 = torch.tensor([1.0])
@@ -685,11 +708,15 @@ class FLinearQ(torch.autograd.Function):
     # print(torch.unique(grad_output_h2).shape[0])
 
     grad_w = (grad_output_h2 @ x_h2) 
+
+    # if quantPrintStats:
+    #   print(grad_w.max())
+
     n = 2**quantAccBits / 2 - 1
     grad_w = torch.clamp(grad_w, -n, n)
 
     # 
-    return grad_input * sg1 * swh1 * sw, grad_w * sg2 * sxh2 * sx * 1 / biggest_power2_factor(h_bs.shape[0]), None, None, None, None
+    return grad_input * sg1 * swh1 * sw * 1 / biggest_power2_factor(h_out.shape[0]), grad_w * sg2 * sxh2 * sx * 1 / biggest_power2_factor(h_bs.shape[0]), None, None, None, None
 
 
 def grad_scale(x, scale):
@@ -770,12 +797,12 @@ class Linear_Ours(nn.Linear):
       w_q = lsq(self.weight, self.lsq_wgt, self.QpW, self.QnW)
     elif quantFWDWgt == 'mem':
       # make sure grad updates
-      with torch.no_grad():
-        tmp_w = torch.clip(
-            self.weight, -(2**(quantWgtStoreBits - 1) - 1), (2**(quantWgtStoreBits - 1) - 1))
-        tmp_w = torch.round(tmp_w)
+      # with torch.no_grad():
+      #   tmp_w = torch.clip(
+      #     self.weight, -(2**(quantWgtStoreBits - 1) - 1), (2**(quantWgtStoreBits - 1) - 1))
+      #   tmp_w = torch.round(tmp_w)
 
-        self.weight.data = tmp_w
+      #   self.weight.data = tmp_w
 
       w_q = self.weight
       sw = self.sw
@@ -847,7 +874,10 @@ class Conv2d_Ours(nn.Conv2d):
         mx = self.weight.abs().max() * scale_dyn_range
         scale = mx / (2**(quantWgtStoreBits - 1) - 1)
 
-        self.register_buffer('sw', scale)
+        mult_mx = 2**(quantWgtStoreBits - 1) - 1
+        mult_scale = mult_mx / (2**(quantBits - 1) - 1)
+
+        self.register_buffer('sw', scale * mult_scale)
         self.weight.data = torch.round(self.weight / (scale + 1e-32))
 
   def forward(self, input):
@@ -864,11 +894,11 @@ class Conv2d_Ours(nn.Conv2d):
       w_q = lsq(self.weight, self.lsq_wgt, self.QpW, self.QnW)
     elif quantFWDWgt == 'mem':
       # make sure grad updates
-      with torch.no_grad():
-        # tmp_w = torch.clip(self.weight, -(2**(quantWgtStoreBits-1)-1), (2**(quantWgtStoreBits-1)-1))
-        # tmp_w = torch.round(tmp_w)
+      # with torch.no_grad():
+      #   # tmp_w = torch.clip(self.weight, -(2**(quantWgtStoreBits-1)-1), (2**(quantWgtStoreBits-1)-1))
+      #   # tmp_w = torch.round(tmp_w)
 
-        self.weight.data = tmp_w
+      #   self.weight.data = tmp_w
 
       w_q = self.weight
       sw = self.sw

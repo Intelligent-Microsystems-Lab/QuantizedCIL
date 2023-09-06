@@ -12,7 +12,7 @@ study_config = vz.StudyConfig(algorithm='EAGLE_STRATEGY')
 
 study_config.search_space.root.add_float_param('init_dyn_scale', 0.5, 5)
 study_config.search_space.root.add_float_param('dyn_scale', 0.5, 5)
-study_config.search_space.root.add_float_param('quantile', .5, 1.1)
+# study_config.search_space.root.add_float_param('quantile', .5, 1.1)
 study_config.search_space.root.add_float_param('lr', .001, 8.)
 
 
@@ -25,8 +25,8 @@ study = clients.Study.from_study_config(
 
 final_rdict = {}
 
-for i in range(100):
-  suggestions = study.suggest(count=12)
+for i in range(50):
+  suggestions = study.suggest(count=10)
 
   res_dict = {}
   # start jobs
@@ -40,7 +40,7 @@ for i in range(100):
     final_rdict[suggestion._id] = suggestion.parameters
 
     bashCommand = "qsub -o " + ' vizier_quant_cont/' + res_dict[suggestion._id]['uuid'] + '.log' + " -e " + ' vizier_quant_cont/' + res_dict[suggestion._id]['uuid'] + '.err' + " run_mnist.script " + str(
-        params['lr']) + ' ' + str(params['init_dyn_scale']) + ' ' + str(params['dyn_scale']) + ' ' + str(params['quantile']) + ' vizier_quant_cont/' + res_dict[suggestion._id]['uuid'] + '.txt'
+        params['lr']) + ' ' + str(params['init_dyn_scale']) + ' ' + str(params['dyn_scale']) + ' vizier_quant_cont/' + res_dict[suggestion._id]['uuid'] + '.txt'
     process = subprocess.Popen(bashCommand.split(), stdout=subprocess.PIPE)
     output, error = process.communicate()
     if str(output).split(' ')[2].isdigit():
@@ -70,8 +70,12 @@ for i in range(100):
           lines = f.readlines()
           for line in reversed(lines):
             if 'CNN top1 curve: [' in line:
-              vals = line.split('[')[-1].split(' ')
-              auc = float(vals[0][:-1]) + float(vals[1][:-2])
+              vals = line.split('[')[-1]
+              vals = vals.split(']')[0]
+              vals = vals.split(',')
+              auc = sum([float(x) for x in vals])
+              # import pdb; pdb.set_trace()
+              # auc = float(vals[0][:-1]) + float(vals[1][:-2])
               break
 
         for sug in suggestions:
