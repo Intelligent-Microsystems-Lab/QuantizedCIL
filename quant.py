@@ -17,6 +17,9 @@ from torch.autograd.function import InplaceFunction
 
 from backbones.linears import SimpleLinear
 
+from utils.data_manager import DummyDataset
+from torch.utils.data import DataLoader
+
 from squant_function import SQuant_func
 
 from hadamard import make_hadamard, biggest_power2_factor
@@ -243,6 +246,44 @@ def place_quant(m, lin_w, lin_b, c_path='',):
             m.fc.bias = nn.Parameter(lin_b)
   for n, ch in m.named_children():
     place_quant(ch, lin_w, lin_b, c_path + '_' + n,)
+
+
+def balanced_scale_calibration_fwd(memory_tuple, train_set_copy, known_cl,
+                                   total_cl, model):
+  
+  global quantUpdateScalePhase
+  quantUpdateScalePhase = True
+  with torch.no_grad():
+    mem_samples, mem_targets = memory_tuple
+    samples_per_cl = mem_samples.shape[0] / len(torch.unique(mem_targets))
+    # get as many samples from the new classes as for each in memory
+    train_loader_copy = DataLoader(
+        train_set_copy, batch_size=1, shuffle=True
+        )
+    new_samples = {a:[] for a in range(known_cl, total_cl)}
+    for _, input, target in train_loader_copy:
+      new_samples[target.item()].append(input)
+      if sum([len(new_samples[key])==samples_per_cl for key in new_samples]) == len(list(new_samples.keys())):
+        break
+    new_samples = torch.cat([torch.cat(new_samples[key]) for key in new_samples], dim=0)
+    mem_samples = torch.cat([mem_samples, new_samples], dim=0)
+
+    for cl in new_samples:
+      mem_targets = torch.cat([mem_targets, torch.repeat([cl], samples_per_cl)])
+
+    #TODO: make batchsize equal to args batch_size and sample stratified
+    update_loader = DataLoader(
+        DummyDataset(mem_samples, mem_targets, lambda x: x),
+        batch_size=len(mem_samples), shuffle=True
+        )
+    for _, inputs, targets in update_loader:
+      inputs, targets = inputs.to(model._device), targets.to(model._device)
+      model(inputs)
+      break
+    del train_set_copy, train_loader_copy, update_loader
+  
+  update_scale(model)
+  quantUpdateScalePhase = False
 
 
 def update_scale(m, c_path='',):

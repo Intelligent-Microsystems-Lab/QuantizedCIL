@@ -12,6 +12,8 @@ from utils.inc_net import IncrementalNet
 from utils.inc_net import CosineIncrementalNet
 from utils.toolkit import target2onehot, tensor2numpy
 
+from utils.data_manager import DataManager
+
 from backbones.linears import SimpleLinear
 
 from datetime import datetime
@@ -205,12 +207,6 @@ class iCaRL(BaseLearner):
       correct, total = 0, 0
       for i, (_, inputs, targets) in enumerate(train_loader):
 
-        # set quant scale update
-        if gen_cnt % self.args["quantUpdateP"] == 0 and gen_cnt > 0:
-          quant.quantUpdateScalePhase = True
-        else:
-          quant.quantUpdateScalePhase = False
-
         inputs, targets = inputs.to(self._device), targets.to(self._device)
 
 
@@ -254,10 +250,21 @@ class iCaRL(BaseLearner):
 
         local_train_acc = np.around(tensor2numpy(
             local_correct) * 100 / len(targets), decimals=2)
-        # only update scale in one epoch
-        if quant.quantUpdateScalePhase:
-          quant.update_scale(self._network)
-          quant.quantUpdateScalePhase = False
+        
+        # set quant scale update
+        if i % self.args["quantUpdateP"] == 0 and gen_cnt > 0:
+          with torch.no_grad():
+            mem_samples, mem_targets = self._get_memory()
+            # get as many samples from the new classes as for each in memory
+            train_copy = data_manager.get_dataset(
+                            np.arange(self._known_classes, self._total_classes),
+                            source="train",
+                            mode="train",
+                            )
+            quant.balanced_scale_calibration_fwd((mem_samples, mem_targets), train_copy,
+                                           self._known_classes, self._total_classes,
+                                           self._network)
+
         gen_cnt += 1
       train_acc = np.around(tensor2numpy(correct) * 100 / total, decimals=2)
 
@@ -309,11 +316,7 @@ class iCaRL(BaseLearner):
       correct, total = 0, 0
       for i, (_, inputs, targets) in enumerate(train_loader):
 
-        # set quant scale update
-        if i % self.args["quantUpdateP"] == 0 and gen_cnt > 0:
-          quant.quantUpdateScalePhase = True
-        else:
-          quant.quantUpdateScalePhase = False
+        
 
 
         inputs, targets = inputs.to(self._device), targets.to(self._device)
@@ -345,10 +348,21 @@ class iCaRL(BaseLearner):
 
         local_train_acc = np.around(tensor2numpy(
             local_correct) * 100 / len(targets), decimals=2)
-        # only update scale in one epoch 
-        if quant.quantUpdateScalePhase:
-          quant.update_scale(self._network)
-          quant.quantUpdateScalePhase = False
+        
+        # set quant scale update
+        if i % self.args["quantUpdateP"] == 0 and gen_cnt > 0:
+          with torch.no_grad():
+            mem_samples, mem_targets = self._get_memory()
+            # get as many samples from the new classes as for each in memory
+            train_copy = data_manager.get_dataset(
+                            np.arange(self._known_classes, self._total_classes),
+                            source="train",
+                            mode="train",
+                            )
+            quant.balanced_scale_calibration_fwd((mem_samples, mem_targets), train_copy,
+                                           self._known_classes, self._total_classes,
+                                           self._network)
+        
         gen_cnt += 1
       train_acc = np.around(tensor2numpy(correct) * 100 / total, decimals=2)
 
