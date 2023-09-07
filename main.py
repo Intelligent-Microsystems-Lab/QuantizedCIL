@@ -134,7 +134,9 @@ def setup_parser():
   parser.add_argument('--quantBWDGrad2', '-qbwdg2', type=str, default="int",
                       required=False, choices=['stoch', 'sq', 'int', 'noq'])
   parser.add_argument('--quantBlockSize', type=int, default=32)
-  parser.add_argument('--quantUpdateP', '-qUP', type=int, default=5)
+  parser.add_argument('--quantUpdateP', '-qUP', type=int, default=100)
+  parser.add_argument('--quantUpdateLowThr', '-qULT', type=float, default=.7)
+  parser.add_argument('--quantUpdateHighThr', '-qUHT', type=float, default=.3)
 
   # training parameters
   parser.add_argument('--init_epoch', type=int, default=170)
@@ -157,7 +159,7 @@ def setup_parser():
   parser.add_argument('--half_dims', action="store_true")
 
   # hyperparameter tuning
-  parser.add_argument('--init_dyn_scale', type=float, default=1.1)
+  # parser.add_argument('--init_dyn_scale', type=float, default=1.1)
   parser.add_argument('--dyn_scale', type=float, default=2.0)
   parser.add_argument('--quantile', type=float, default=0.975)
 

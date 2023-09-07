@@ -111,6 +111,8 @@ def _train(args):
   quant.quantBWDGrad1 = args["quantBWDGrad1"]
   quant.quantBWDGrad2 = args["quantBWDGrad2"]
   quant.quantBlockSize = args["quantBlockSize"]
+  quant.quantUpdateLowThr = args["quantUpdateLowThr"]
+  quant.quantUpdateHighThr = args["quantUpdateHighThr"]
   quant.global_args = args
 
   start_time = time.time()

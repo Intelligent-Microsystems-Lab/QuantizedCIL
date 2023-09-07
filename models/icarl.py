@@ -195,18 +195,22 @@ class iCaRL(BaseLearner):
   def _init_train(self, train_loader, test_loader, optimizer, scheduler):
 
     prog_bar = tqdm(range(self.args['init_epoch']))
+    gen_cnt = 0
     for i, epoch in enumerate(prog_bar):
 
-      # set quant scale update
-      if i % args["quantUpdateP"] == 0 and i > 0:
-        quant.quantUpdateScalePhase = True
-      else:
-        quant.quantUpdateScalePhase = False
+      
 
       self._network.train()
       losses = 0.0
       correct, total = 0, 0
       for i, (_, inputs, targets) in enumerate(train_loader):
+
+        # set quant scale update
+        if gen_cnt % self.args["quantUpdateP"] == 0 and gen_cnt > 0:
+          quant.quantUpdateScalePhase = True
+        else:
+          quant.quantUpdateScalePhase = False
+
         inputs, targets = inputs.to(self._device), targets.to(self._device)
 
 
@@ -250,6 +254,11 @@ class iCaRL(BaseLearner):
 
         local_train_acc = np.around(tensor2numpy(
             local_correct) * 100 / len(targets), decimals=2)
+        # only update scale in one epoch
+        if quant.quantUpdateScalePhase:
+          quant.update_scale(self._network)
+          quant.quantUpdateScalePhase = False
+        gen_cnt += 1
       train_acc = np.around(tensor2numpy(correct) * 100 / total, decimals=2)
 
       if epoch % 5 == 0:
@@ -279,10 +288,9 @@ class iCaRL(BaseLearner):
       scheduler.step()
       prog_bar.set_description(info)
 
-      # only update scale in one epoch
-      if quant.quantUpdateScalePhase:
-        quant.quantUpdateScalePhase = False
-
+      
+    print('CLEMENS look here')
+    print(gen_cnt)
     logging.info(info)
     # print('init_train')
     # for n,w in self._network.named_parameters():
@@ -292,18 +300,22 @@ class iCaRL(BaseLearner):
 
   def _update_representation(self, train_loader, test_loader, optimizer, scheduler):
     prog_bar = tqdm(range(self.args['epochs']))
-    for _, epoch in enumerate(prog_bar):
 
-      # set quant scale update
-      if i % args["quantUpdateP"] == 0 and i > 0:
-        quant.quantUpdateScalePhase = True
-      else:
-        quant.quantUpdateScalePhase = False
+    gen_cnt = 0
+    for i, epoch in enumerate(prog_bar):
 
       self._network.train()
       losses = 0.0
       correct, total = 0, 0
       for i, (_, inputs, targets) in enumerate(train_loader):
+
+        # set quant scale update
+        if i % self.args["quantUpdateP"] == 0 and gen_cnt > 0:
+          quant.quantUpdateScalePhase = True
+        else:
+          quant.quantUpdateScalePhase = False
+
+
         inputs, targets = inputs.to(self._device), targets.to(self._device)
         logits = self._network(inputs)["logits"]
 
@@ -333,6 +345,11 @@ class iCaRL(BaseLearner):
 
         local_train_acc = np.around(tensor2numpy(
             local_correct) * 100 / len(targets), decimals=2)
+        # only update scale in one epoch 
+        if quant.quantUpdateScalePhase:
+          quant.update_scale(self._network)
+          quant.quantUpdateScalePhase = False
+        gen_cnt += 1
       train_acc = np.around(tensor2numpy(correct) * 100 / total, decimals=2)
 
       if epoch % 5 == 0:
@@ -362,9 +379,7 @@ class iCaRL(BaseLearner):
       scheduler.step()
       prog_bar.set_description(info)
 
-      # only update scale in one epoch 
-      if quant.quantUpdateScalePhase:
-        quant.quantUpdateScalePhase = False
+      
 
     logging.info(info)
 

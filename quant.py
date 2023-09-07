@@ -43,6 +43,8 @@ quantBWDGrad1 = "int"
 quantBWDGrad2 = "int"
 quantBlockSize = 32
 quantUpdateScalePhase = False
+quantUpdateLowThr = .7
+quantUpdateHighThr = .3
 global_args = None
 
 current_uname = ''
@@ -92,11 +94,6 @@ class QuantMomentumOptimizer(torch.optim.Optimizer):
           p.data = torch.clip(
               p.data, -(2**(quantWgtStoreBits - 1) - 1), (2**(quantWgtStoreBits - 1) - 1))
           p.data = torch.round(p.data)
-
-          global quantUpdateScalePhase
-          global scale_library
-          if quantUpdateScalePhase:
-            if scale_library
 
           # backup == p.data
           # print(torch.abs(backup - p.data).max())
@@ -246,6 +243,57 @@ def place_quant(m, lin_w, lin_b, c_path='',):
             m.fc.bias = nn.Parameter(lin_b)
   for n, ch in m.named_children():
     place_quant(ch, lin_w, lin_b, c_path + '_' + n,)
+
+
+def update_scale(m, c_path='',):
+
+  for attr_str in dir(m):
+    if attr_str[:1] != '_':
+      target_attr = getattr(m, attr_str)
+      if isinstance(target_attr, Conv2d_Ours):
+        if hasattr(target_attr, 'c1'):
+          if scale_library[c_path + '_' + attr_str][1] > quantUpdateHighThr:
+            with torch.no_grad():
+              target_attr.weight /= 2
+              # TODO: maybe try ceil
+              target_attr.weight.data = torch.floor(target_attr.weight.data)
+              # TODO: check if times two is correct
+              target_attr.sw *= 2
+              print('increased scale '+c_path + '_' + attr_str)
+          if scale_library[c_path + '_' + attr_str][0] > quantUpdateLowThr:
+            with torch.no_grad():
+              target_attr.weight *= 2
+              # TODO: maybe try ceil
+              target_attr.weight.data = torch.floor(target_attr.weight.data)
+              # TODO: check if times two is correct
+              target_attr.sw /= 2
+              print('decreased scale '+c_path + '_' + attr_str)
+          
+      if isinstance(target_attr, Linear_Ours): # or isinstance(target_attr,
+        if hasattr(target_attr, 'c1'):
+          # print(attr_str)
+          # import pdb; pdb.set_trace()
+          if scale_library[c_path + '_' + attr_str][1] > quantUpdateHighThr:
+            with torch.no_grad():
+              target_attr.weight /= 2
+              # TODO: maybe try ceil
+              target_attr.weight.data = torch.floor(target_attr.weight.data)
+              # TODO: check if times two is correct
+              target_attr.sw *= 2
+              print('increased scale '+c_path + '_' + attr_str)
+          if scale_library[c_path + '_' + attr_str][0] > quantUpdateLowThr:
+            with torch.no_grad():
+              target_attr.weight *= 2
+              # TODO: maybe try ceil
+              target_attr.weight.data = torch.floor(target_attr.weight.data)
+              # TODO: check if times two is correct
+              target_attr.sw /= 2
+              print('decreased scale '+c_path + '_' + attr_str)
+
+          
+  for n, ch in m.named_children():
+    update_scale(ch, c_path + '_' + n,)
+
 
 
 def save_lin_params(m):
@@ -632,37 +680,43 @@ class FLinearQ(torch.autograd.Function):
       w = torch.round(w / (scale + 1e-32))
 
 
-    fin_output = torch.zeros((x.shape[0], w.shape[0]))
-    for i in range(int(np.ceil( x.shape[1]/quantBlockSize ))):
-      output = F.linear(x[:,i*quantBlockSize:(i+1)*quantBlockSize], w[:,i*quantBlockSize:(i+1)*quantBlockSize])
-      # requantize to acc BW (clamp to big values - no scale)
-      n = 2**quantAccBits / 2 - 1
-      output = torch.clamp(output, -n, n)
+    # fin_output = torch.zeros((x.shape[0], w.shape[0])).to(x.device)
+    # for i in range(int(np.ceil( x.shape[1]/quantBlockSize ))):
+    #   output = F.linear(x[:,i*quantBlockSize:(i+1)*quantBlockSize], w[:,i*quantBlockSize:(i+1)*quantBlockSize])
+    #   # requantize to acc BW (clamp to big values - no scale)
+    #   n = 2**quantAccBits / 2 - 1
+    #   output = torch.clamp(output, -n, n)
 
-      if quantUpdateScalePhase:
-        global scale_library
-        global current_uname
-        scale_library[current_uname] = (int(torch.sum(output == 0.))/np.prod(output.shape),
-                                        max(int(torch.sum(output == n))/np.prod(output.shape),
-                                            int(torch.sum(output == -n))/np.prod(output.shape)))
+    #   if quantUpdateScalePhase and i == 0:
+    #     global scale_library
+    #     global current_uname
+    #     scale_library[current_uname] = (int(torch.sum(output == 0.))/np.prod(output.shape),
+    #                                     max(int(torch.sum(output == n))/np.prod(output.shape),
+    #                                         int(torch.sum(output == -n))/np.prod(output.shape)))
 
 
-      # if current_uname in track_stats['zeros']:
-      #   track_stats['zeros'][current_uname].append(int(torch.sum(output == 0.))/np.prod(output.shape))
-      # else:
-      #   track_stats['zeros'][current_uname] = [int(torch.sum(output == 0.))/np.prod(output.shape)]
+    #   # if current_uname in track_stats['zeros']:
+    #   #   track_stats['zeros'][current_uname].append(int(torch.sum(output == 0.))/np.prod(output.shape))
+    #   # else:
+    #   #   track_stats['zeros'][current_uname] = [int(torch.sum(output == 0.))/np.prod(output.shape)]
 
-      # if current_uname in track_stats['maxv']:
-      #   track_stats['maxv'][current_uname].append(max(int(torch.sum(output == n))/np.prod(output.shape), int(torch.sum(output == -n))/np.prod(output.shape)))
-      # else:
-      #   track_stats['maxv'][current_uname] = [max(int(torch.sum(output == n))/np.prod(output.shape) , int(torch.sum(output == -n))/np.prod(output.shape))]
+    #   # if current_uname in track_stats['maxv']:
+    #   #   track_stats['maxv'][current_uname].append(max(int(torch.sum(output == n))/np.prod(output.shape), int(torch.sum(output == -n))/np.prod(output.shape)))
+    #   # else:
+    #   #   track_stats['maxv'][current_uname] = [max(int(torch.sum(output == n))/np.prod(output.shape) , int(torch.sum(output == -n))/np.prod(output.shape))]
 
-      fin_output += output
+    #   fin_output += output
 
-    # fin_output = F.linear(x, w)
-    # n = 2**quantAccBits / 2 - 1
-    # fin_output = torch.clamp(fin_output, -n, n)
+    fin_output = F.linear(x, w)
+    n = 2**quantAccBits / 2 - 1
+    fin_output = torch.clamp(fin_output, -n, n)
 
+    if quantUpdateScalePhase:
+      global scale_library
+      global current_uname
+      scale_library[current_uname] = (int(torch.sum(fin_output == 0.))/np.prod(fin_output.shape),
+                                        max(int(torch.sum(fin_output == n))/np.prod(fin_output.shape),
+                                            int(torch.sum(fin_output == -n))/np.prod(fin_output.shape)))
 
     return fin_output * sw * sx
 
