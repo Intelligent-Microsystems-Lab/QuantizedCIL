@@ -19,6 +19,9 @@ from backbones.linears import SimpleLinear
 from datetime import datetime
 import quant
 
+import numpy as np
+import matplotlib.pyplot as plt
+
 track_layer_list = ['_convnet_conv_1_3x3', '_convnet_stage_1_2_conv_b',
                     '_convnet_stage_2_4_conv_a', '_convnet_stage_3_3_conv_a', '_fc']
 
@@ -95,16 +98,16 @@ class iCaRL(BaseLearner):
         cur_test_acc = self._compute_accuracy(self._network, self.test_loader)
         logging.info(f"Loaded_Test_Acc:{load_acc} Cur_Test_Acc:{cur_test_acc}")
       else:
-        self._train(self.train_loader, self.test_loader) 
+        self._train(self.train_loader, self.test_loader, data_manager) 
         self._compute_accuracy(self._network, self.test_loader)
     else:
-      self._train(self.train_loader, self.test_loader)
+      self._train(self.train_loader, self.test_loader, data_manager)
 
     self.build_rehearsal_memory(data_manager, self.samples_per_class)
     if len(self._multiple_gpus) > 1:
       self._network = self._network.module
 
-  def _train(self, train_loader, test_loader):
+  def _train(self, train_loader, test_loader, data_manager):
     self._network.to(self._device)
     if self._old_network is not None:
       self._old_network.to(self._device)
@@ -135,7 +138,7 @@ class iCaRL(BaseLearner):
       else:
         raise NotImplementedError
 
-      self._init_train(train_loader, test_loader, optimizer, scheduler)
+      self._init_train(train_loader, test_loader, optimizer, scheduler, data_manager)
     else:
       if self.args["optimizer"] == "sgd":
         optimizer = optim.SGD(
@@ -165,7 +168,7 @@ class iCaRL(BaseLearner):
       else:
         raise NotImplementedError
       self._update_representation(
-          train_loader, test_loader, optimizer, scheduler)
+          train_loader, test_loader, optimizer, scheduler, data_manager)
 
     if quant.quantTrack:
         # save grads
@@ -181,12 +184,34 @@ class iCaRL(BaseLearner):
             np.save('track_stats/' + self.date_str + '_' + self.args['dataset'] + '_' + self.args['model_name'] + '_' + str(
                 self._cur_task) + lname + '_' + stat_name + '.npy', torch.hstack(quant.track_stats['grad_stats'][lname][stat_name]).numpy())
 
-    # # import pdb; pdb.set_trace()
-    # for lname in ['_backbone_net_0_lw', '_backbone_net_1_lw', '_fc']:
-    #   for stat_name in ['zeros', 'maxv']:
-    #     np.save('track_stats/' + self.date_str + '_' + self.args['dataset'] + '_' + self.args['model_name'] + '_' + str(
-    #         self._cur_task) + lname + '_' + stat_name + '.npy', np.array(quant.track_stats[stat_name][lname]))
-    #     quant.track_stats[stat_name][lname] = []
+    # import pdb; pdb.set_trace()
+    for lname in ['_backbone_net_0_lw', '_backbone_net_1_lw', '_fc']:
+      for stat_name in ['zeros', 'maxv']:
+        np.save('track_stats/' + self.date_str + '_' + self.args['dataset'] + '_' + self.args['model_name'] + '_' + str(self._cur_task) + lname + '_' + stat_name + '.npy', np.array(quant.track_stats[stat_name][lname]))
+        quant.track_stats[stat_name][lname] = []
+
+      # plots
+      fig, ax = plt.subplots(1,1, figsize=(10, 10),)
+
+      for i in [self._cur_task]:
+        data = np.load('track_stats/'+self.date_str+'_pamap_icarl_{}{}_maxv.npy'.format(i, lname))
+        # import pdb; pdb.set_trace()
+        ax.plot(data)
+        ax.set_ylim(0, 1)
+
+      # plt.show()
+
+      # fig, ax = plt.subplots(1,5, figsize=(50, 10),)
+
+      # for i in [self._cur_task]:
+      #   data = np.load('track_stats/'+self.date_str+'_pamap_icarl_{}_backbone_net_0_lw_zeros.npy'.format(i))
+
+      #   ax.plot(data)
+      #   ax.set_ylim(0, 1)
+
+      plt.savefig('track_stats/'+str(self.date_str)+'_pamap_icarl_nn_'+lname+'_'+str(self._cur_task)+'_lw_zeros.png')
+
+        
 
     # print('train')
     # for n,w in self._network.named_parameters():
@@ -194,7 +219,7 @@ class iCaRL(BaseLearner):
     #     print(n)
     #     print(torch.norm(w))
 
-  def _init_train(self, train_loader, test_loader, optimizer, scheduler):
+  def _init_train(self, train_loader, test_loader, optimizer, scheduler, data_manager):
 
     prog_bar = tqdm(range(self.args['init_epoch']))
     gen_cnt = 0
@@ -225,6 +250,7 @@ class iCaRL(BaseLearner):
         #     if param.grad is not None:
         #       unquantized_grad[k] = copy.deepcopy(param.grad)
 
+        backup_w = copy.deepcopy({k:x for k, x in self._network.named_parameters()})
         optimizer.step()
         losses += loss.item()
 
@@ -254,16 +280,25 @@ class iCaRL(BaseLearner):
         # set quant scale update
         if i % self.args["quantUpdateP"] == 0 and gen_cnt > 0:
           with torch.no_grad():
-            mem_samples, mem_targets = self._get_memory()
+            try:
+              mem_samples, mem_targets = self._get_memory()
+            except:
+              mem_samples, mem_targets = np.zeros_like(inputs.cpu()), np.zeros_like(targets.cpu())
             # get as many samples from the new classes as for each in memory
             train_copy = data_manager.get_dataset(
                             np.arange(self._known_classes, self._total_classes),
                             source="train",
                             mode="train",
+                            no_trsf = True,
                             )
+            
+            with torch.no_grad():
+              no_update_perc = { k: np.mean((backup_w[k] == v).cpu().numpy()) for k,v in self._network.named_parameters()}
+            # import pdb; pdb.set_trace()
+            # np.mean((backup == p.data).cpu().numpy())
             quant.balanced_scale_calibration_fwd((mem_samples, mem_targets), train_copy,
                                            self._known_classes, self._total_classes,
-                                           self._network)
+                                           self._network, inputs.device, data_manager, no_update_perc)
 
         gen_cnt += 1
       train_acc = np.around(tensor2numpy(correct) * 100 / total, decimals=2)
@@ -305,7 +340,7 @@ class iCaRL(BaseLearner):
     #     print(n)
     #     print(torch.norm(w))
 
-  def _update_representation(self, train_loader, test_loader, optimizer, scheduler):
+  def _update_representation(self, train_loader, test_loader, optimizer, scheduler, data_manager):
     prog_bar = tqdm(range(self.args['epochs']))
 
     gen_cnt = 0
@@ -329,7 +364,7 @@ class iCaRL(BaseLearner):
             self.args['T'],
         )
 
-        loss = loss_clf + loss_kd
+        loss = loss_clf + 4 * loss_kd
         optimizer.zero_grad()
         loss.backward()
 
@@ -358,10 +393,11 @@ class iCaRL(BaseLearner):
                             np.arange(self._known_classes, self._total_classes),
                             source="train",
                             mode="train",
+                            no_trsf = True,
                             )
             quant.balanced_scale_calibration_fwd((mem_samples, mem_targets), train_copy,
                                            self._known_classes, self._total_classes,
-                                           self._network)
+                                           self._network, inputs.device, data_manager)
         
         gen_cnt += 1
       train_acc = np.around(tensor2numpy(correct) * 100 / total, decimals=2)

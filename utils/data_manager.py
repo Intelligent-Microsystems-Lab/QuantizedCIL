@@ -29,7 +29,7 @@ class DataManager(object):
     return len(self._class_order)
 
   def get_dataset(
-      self, indices, source, mode, appendent=None, ret_data=False, m_rate=None
+      self, indices, source, mode, appendent=None, ret_data=False, m_rate=None, no_trsf=False,
   ):
     if source == "train":
       x, y = self._train_data, self._train_targets
@@ -72,7 +72,8 @@ class DataManager(object):
       targets.append(appendent_targets)
 
     data, targets = np.concatenate(data), np.concatenate(targets)
-
+    # if no_trsf:
+    #   trsf = transforms.Compose([transforms.ToTensor(), transforms.Lambda(lambda x: torch.flatten(x) )])
     if ret_data:
       return data, targets, DummyDataset(data, targets, trsf, self.use_path,
                                          self.datatype)
