@@ -10,9 +10,8 @@ import pandas as pd
 # Algorithm, search space, and metrics.
 study_config = vz.StudyConfig(algorithm='EAGLE_STRATEGY')
 
-study_config.search_space.root.add_int_param('quantUpdateP', 1, 500)
-study_config.search_space.root.add_float_param('dyn_scale', 0.5, 10)
-study_config.search_space.root.add_float_param('lr', .001, 8.)
+study_config.search_space.root.add_float_param('lr', .001, 5.)
+study_config.search_space.root.add_int_param('quantUpdateP', 1, 50_000)
 study_config.search_space.root.add_float_param('quantUpdateLowThr', .00000001, 1.)
 study_config.search_space.root.add_float_param('quantUpdateHighThr', .00000001, 1.)
 
@@ -26,7 +25,7 @@ study = clients.Study.from_study_config(
 final_rdict = {}
 
 for i in range(120):
-  suggestions = study.suggest(count=12)
+  suggestions = study.suggest(count=7)
 
   res_dict = {}
   # start jobs
@@ -40,7 +39,7 @@ for i in range(120):
     final_rdict[suggestion._id] = suggestion.parameters
 
     bashCommand = "qsub -o " + ' vizier_quant_cont/' + res_dict[suggestion._id]['uuid'] + '.log' + " -e " + ' vizier_quant_cont/' + res_dict[suggestion._id]['uuid'] + '.err' + " run_mnist.script " + str(
-        params['lr']) + ' ' + str(params['dyn_scale']) + ' ' + str(int(params['quantUpdateP'])) + ' ' + str(params['quantUpdateHighThr']) + ' ' + str(params['quantUpdateLowThr']) + ' vizier_quant_cont/' + res_dict[suggestion._id]['uuid'] + '.txt'
+        params['lr']) + ' ' + str(int(params['quantUpdateP'])) + ' ' + str(params['quantUpdateLowThr']) + ' ' + str(params['quantUpdateHighThr']) + ' vizier_quant_cont/' + res_dict[suggestion._id]['uuid'] + '.txt'
     process = subprocess.Popen(bashCommand.split(), stdout=subprocess.PIPE)
     output, error = process.communicate()
     if str(output).split(' ')[2].isdigit():

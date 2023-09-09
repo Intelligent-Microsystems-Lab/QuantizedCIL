@@ -52,6 +52,7 @@ quantUpdateScalePhase = False
 quantUpdateLowThr = .7
 quantUpdateHighThr = .3
 global_args = None
+quant_no_update_perc = None
 
 current_uname = ''
 
@@ -215,7 +216,7 @@ def place_quant(m, lin_w, lin_b, c_path='',):
 
 
 def balanced_scale_calibration_fwd(memory_tuple, train_set_copy, known_cl,
-                                   total_cl, model, device, data_manager, no_update_perc):
+                                   total_cl, model, device, data_manager):
   
   global quantUpdateScalePhase
   quantUpdateScalePhase = True
@@ -274,6 +275,7 @@ def update_scale(m, c_path='',):
       target_attr = getattr(m, attr_str)
       if isinstance(target_attr, Conv2d_Ours):
         if hasattr(target_attr, 'c1'):
+          c_name = c_path + '_' + attr_str
           if scale_library[c_path + '_' + attr_str][1] > quantUpdateHighThr:
             with torch.no_grad():
               target_attr.weight /= 2
@@ -281,20 +283,22 @@ def update_scale(m, c_path='',):
               target_attr.weight.data = torch.floor(target_attr.weight.data)
               # TODO: check if times two is correct
               target_attr.sw *= 2
-              print('increased scale '+c_path + '_' + attr_str)
-          elif scale_library[c_path + '_' + attr_str][0] > quantUpdateLowThr:
+              # print('increased scale '+c_path + '_' + attr_str)
+            # elif quant_no_update_perc[c_name.replace('_', '.')[1:] + '.weight'] > quantUpdateLowThr:
+          elif scale_library[c_path + '_' + attr_str][1] < quantUpdateLowThr:
             with torch.no_grad():
               target_attr.weight *= 2
               # TODO: maybe try ceil
               target_attr.weight.data = torch.floor(target_attr.weight.data)
               # TODO: check if times two is correct
               target_attr.sw /= 2
-              print('decreased scale '+c_path + '_' + attr_str)
+              # print('decreased scale '+c_path + '_' + attr_str)
           
       if isinstance(target_attr, Linear_Ours): # or isinstance(target_attr,
         if hasattr(target_attr, 'c1'):
           # print(attr_str)
           # import pdb; pdb.set_trace()
+          c_name = c_path + '_' + attr_str
           if scale_library[c_path + '_' + attr_str][1] > quantUpdateHighThr:
             with torch.no_grad():
               target_attr.weight /= 2
@@ -302,15 +306,16 @@ def update_scale(m, c_path='',):
               target_attr.weight.data = torch.floor(target_attr.weight.data)
               # TODO: check if times two is correct
               target_attr.sw *= 2
-              print('increased scale '+c_path + '_' + attr_str)
-          elif scale_library[c_path + '_' + attr_str][0] > quantUpdateLowThr:
+              # print('increased scale '+c_path + '_' + attr_str)
+            # elif quant_no_update_perc[c_name.replace('_', '.')[1:] + '.weight'] > quantUpdateLowThr:
+          elif  scale_library[c_path + '_' + attr_str][1] < quantUpdateLowThr:
             with torch.no_grad():
               target_attr.weight *= 2
               # TODO: maybe try ceil
               target_attr.weight.data = torch.floor(target_attr.weight.data)
               # TODO: check if times two is correct
               target_attr.sw /= 2
-              print('decreased scale '+c_path + '_' + attr_str)
+              # print('decreased scale '+c_path + '_' + attr_str)
 
           
   for n, ch in m.named_children():
@@ -381,7 +386,7 @@ class dynamic_intQ_FWD(Function):
       scale = mx / (2**(quantBits) - 1)
       x = torch.clamp(x, 0, mx)
 
-    return torch.round(x / scale), scale
+    return torch.round(x / (scale + 1e-32) ), scale
 
   @staticmethod
   def backward(ctx, grad_output, grad_scale):
@@ -396,6 +401,9 @@ class dynamic_intQ_FWD(Function):
         [0], dtype=x.dtype, device=x.device), grad_output)
     grad_output = torch.where(
         x < -local_mx, torch.tensor([0], dtype=x.dtype, device=x.device), grad_output)
+    # import pdb; pdb.set_trace()
+    if torch.isnan(grad_output).any():
+      import pdb; pdb.set_trace()
     return grad_output, None
 
 
@@ -408,7 +416,6 @@ class FLinearQ(torch.autograd.Function):
 
     if quantFWDWgt == 'mem':
       # only get quantFWDWgt
-      import pdb; pdb.set_trace()
       mx = 2**(quantWgtStoreBits - 1) - 1
       scale = mx / (2**(quantBits - 1) - 1)
       w = torch.clamp(w, -mx, mx)
@@ -416,7 +423,10 @@ class FLinearQ(torch.autograd.Function):
 
 
     global current_uname
-    fin_output = torch.zeros((x.shape[0], w.shape[0])).to(x.device)
+    # fin_output = torch.zeros((x.shape[0], w.shape[0])).to(x.device)
+
+    fin_output = 0 * F.linear(x[:,0:quantBlockSize], w[:,0:quantBlockSize])
+
     for i in range(int(np.ceil( x.shape[1]/quantBlockSize ))):
       output = F.linear(x[:,i*quantBlockSize:(i+1)*quantBlockSize], w[:,i*quantBlockSize:(i+1)*quantBlockSize])
       # requantize to acc BW (clamp to big values - no scale)
@@ -431,17 +441,17 @@ class FLinearQ(torch.autograd.Function):
                                         max(int(torch.sum(output == n))/np.prod(output.shape),
                                             int(torch.sum(output == -n))/np.prod(output.shape)))
 
-      if quantRelevantMeasurePass:
-
+      if quantRelevantMeasurePass and i == 0:
+        # import pdb; pdb.set_trace()
         if current_uname in track_stats['zeros']:
-          track_stats['zeros'][current_uname].append(int(torch.sum(fin_output == 0.))/np.prod(fin_output.shape))
+          track_stats['zeros'][current_uname].append(torch.sum(output == 0.)/np.prod(output.shape))
         else:
-          track_stats['zeros'][current_uname] = [int(torch.sum(fin_output == 0.))/np.prod(fin_output.shape)]
+          track_stats['zeros'][current_uname] = [torch.sum(output == 0.)/np.prod(output.shape)]
 
         if current_uname in track_stats['maxv']:
-          track_stats['maxv'][current_uname].append(max(int(torch.sum(fin_output == n))/np.prod(fin_output.shape), int(torch.sum(fin_output == -n))/np.prod(fin_output.shape)))
+          track_stats['maxv'][current_uname].append(torch.max(torch.sum(output == n)/np.prod(output.shape), torch.sum(output == -n)/np.prod(output.shape)))
         else:
-          track_stats['maxv'][current_uname] = [max(int(torch.sum(fin_output == n))/np.prod(fin_output.shape) , int(torch.sum(fin_output == -n))/np.prod(fin_output.shape))]
+          track_stats['maxv'][current_uname] = [torch.max(torch.sum(output == n)/np.prod(output.shape) , torch.sum(output == -n)/np.prod(output.shape))]
 
       fin_output += output
 
@@ -468,7 +478,6 @@ class FLinearQ(torch.autograd.Function):
     #   scale_library[current_uname] = (int(torch.sum(fin_output == 0.))/np.prod(fin_output.shape),
     #                                     max(int(torch.sum(fin_output == n))/np.prod(fin_output.shape),
     #                                         int(torch.sum(fin_output == -n))/np.prod(fin_output.shape)))
-
 
     return fin_output * sw * sx
 
@@ -555,7 +564,11 @@ class FLinearQ(torch.autograd.Function):
     n = 2**quantAccBits / 2 - 1
     grad_w = torch.clamp(grad_w, -n, n)
 
-    # 
+    if torch.isnan(grad_input).any():
+      import pdb; pdb.set_trace()
+    if torch.isnan(grad_w).any():
+      import pdb; pdb.set_trace()
+
     return grad_input * sg1 * swh1 * sw * 1 / biggest_power2_factor(h_out.shape[0]), grad_w * sg2 * sxh2 * sx * 1 / biggest_power2_factor(h_bs.shape[0]), None, None, None, None
 
 
@@ -766,15 +779,15 @@ class Conv2d_Ours(nn.Conv2d):
       self.hadamard_bs = torch.tensor(make_hadamard(
           qinput.shape[1]), dtype=self.weight.dtype).to(self.weight.device)
 
-    flinearq_fn = torch.vmap(FLinearQ.apply, randomness='different')
-    out = flinearq_fn(qinput, w_q.T.unsqueeze(0).repeat(qinput.shape[0], 1, 1), self.hadamard_out.unsqueeze(
-        0).repeat(qinput.shape[0], 1, 1), self.hadamard_bs.unsqueeze(0).repeat(qinput.shape[0], 1, 1),
-        sa.unsqueeze(0).repeat(qinput.shape[0], 1, 1), sw.unsqueeze(0).repeat(qinput.shape[0], 1, 1))
+    # flinearq_fn = torch.vmap(FLinearQ.apply, randomness='different')
+    # out = flinearq_fn(qinput, w_q.T.unsqueeze(0).repeat(qinput.shape[0], 1, 1), self.hadamard_out.unsqueeze(
+    #     0).repeat(qinput.shape[0], 1, 1), self.hadamard_bs.unsqueeze(0).repeat(qinput.shape[0], 1, 1),
+    #     sa.unsqueeze(0).repeat(qinput.shape[0], 1, 1), sw.unsqueeze(0).repeat(qinput.shape[0], 1, 1))
 
-    # out = []
-    # for i in range(qinput.shape[0]):
-    #   out.append(FLinearQ.apply(qinput[i,:], w_q.T, self.hadamard_out, self.hadamard_bs))
-    # out = torch.stack(out)
+    out = []
+    for i in range(qinput.shape[0]):
+      out.append(FLinearQ.apply(qinput[i,:], w_q.T, self.hadamard_out, self.hadamard_bs, sa, sw))
+    out = torch.stack(out)
 
     # reshaping outputs into image form with batch, channel, height, width
     out = out.transpose(1, 2)

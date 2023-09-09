@@ -106,7 +106,7 @@ def setup_parser():
                       default='benchmark', choices=['benchmark', 'fair',
                                                     'auc'])
   parser.add_argument('--device', '-d', nargs='+',
-                      type=int, default=[0, 1, 2, 3])
+                      type=int, default=[0,])
   parser.add_argument('--debug', action="store_true")
   parser.add_argument('--skip', action="store_true",)
   parser.add_argument('--seed', '-seed', nargs='+', type=int, default=[1994],)
