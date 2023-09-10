@@ -150,8 +150,6 @@ def init_properties(obj, uname):
   obj.uname = uname
 
 
-
-
 def place_quant(m, lin_w, lin_b, c_path='',):
 
   for attr_str in dir(m):
@@ -216,43 +214,43 @@ def place_quant(m, lin_w, lin_b, c_path='',):
 
 
 def balanced_scale_calibration_fwd(memory_tuple, train_set_copy, known_cl,
-                                   total_cl, model, device, data_manager):
+                                   total_cl, model, device, data_manager, replay = True):
   
   global quantUpdateScalePhase
   quantUpdateScalePhase = True
   with torch.no_grad():
     mem_samples, mem_targets = memory_tuple
     samples_per_cl = mem_samples.shape[0] / len(np.unique(mem_targets))
-    # get as many samples from the new classes as for each in memory
-    train_loader_copy = DataLoader(
-        train_set_copy, batch_size=1, shuffle=True
-        )
-    new_samples = {a:[] for a in range(known_cl, total_cl)}
-    for _, input, target in train_loader_copy:
-      if len(new_samples[target.item()]) < samples_per_cl:
-        new_samples[target.item()].append(input)
-        if sum([len(new_samples[key])==samples_per_cl for key in new_samples]) == len(list(new_samples.keys())):
-          break
+    if replay:
+      # get as many samples from the new classes as for each in memory
+      train_loader_copy = DataLoader(
+          train_set_copy, batch_size=1, shuffle=True
+          )
+      new_samples = {a:[] for a in range(known_cl, total_cl)}
+      for _, input, target in train_loader_copy:
+        if len(new_samples[target.item()]) < samples_per_cl:
+          new_samples[target.item()].append(input)
+          if sum([len(new_samples[key])==samples_per_cl for key in new_samples]) == len(list(new_samples.keys())):
+            break
 
-    for cl in range(known_cl, total_cl):
-      mem_targets = np.concatenate([mem_targets, torch.tensor([cl] * new_samples[cl].__len__() )])
+      for cl in range(known_cl, total_cl):
+        mem_targets = np.concatenate([mem_targets, torch.tensor([cl] * new_samples[cl].__len__() )])
 
-    # import pdb; pdb.set_trace()
-    new_samples = np.concatenate([np.concatenate(new_samples[key], axis=0) for key in new_samples.keys()], axis=0)
-    # import pdb; pdb.set_trace()
-
-    try:
-      mem_samples = np.concatenate([mem_samples, new_samples], axis=0)
-    except:
       # import pdb; pdb.set_trace()
-      mem_samples = np.reshape(mem_samples, (mem_samples.shape[0], new_samples.shape[1],))
-      mem_samples = np.concatenate([mem_samples, new_samples], axis=0)
+      new_samples = np.concatenate([np.concatenate(new_samples[key], axis=0) for key in new_samples.keys()], axis=0)
+      # import pdb; pdb.set_trace()
+
+      try:
+        mem_samples = np.concatenate([mem_samples, new_samples], axis=0)
+      except:
+        # import pdb; pdb.set_trace()
+        mem_samples = np.reshape(mem_samples, (mem_samples.shape[0], new_samples.shape[1],))
+        mem_samples = np.concatenate([mem_samples, new_samples], axis=0)
+
+      del train_set_copy, train_loader_copy
 
     # TODO: make batchsize equal to args batch_size and sample stratified
     # TODO: datatype HAR wrong @ms400?
-    # try:
-    # import pdb; pdb.set_trace()
-    # try:
     update_loader = DataLoader(
         DummyDataset(torch.tensor(mem_samples), torch.tensor(mem_targets), transforms.Compose([*data_manager._train_trsf,]), datatype = 'HAR' if len(mem_samples.shape) <= 2 else 'image'),
         batch_size=len(mem_samples), shuffle=True
@@ -262,7 +260,7 @@ def balanced_scale_calibration_fwd(memory_tuple, train_set_copy, known_cl,
       inputs, targets = inputs.to(device), targets.to(device)
       model(inputs)
       break
-    del train_set_copy, train_loader_copy, update_loader
+    del update_loader
   
   update_scale(model)
   quantUpdateScalePhase = False
@@ -343,7 +341,9 @@ def dynamic_stoch(x, scale=1):
   dim = x.shape
   x = x.flatten()
 
-  mx = x.abs().max() * scale  # torch.quantile(x.abs(), .99) # TODO optimize calibration
+  # import pdb; pdb.set_trace()
+  # print(x.abs().max())
+  mx = torch.min(x.abs().max(), torch.ones_like(x[0]) * 1e+8) * scale  # torch.quantile(x.abs(), .99) # TODO optimize calibration
   scale = mx / (2**(quantBits - 1) - 1)
   x = torch.clamp(x, -mx, mx) / (scale + 1e-32)
 
@@ -402,10 +402,9 @@ class dynamic_intQ_FWD(Function):
     grad_output = torch.where(
         x < -local_mx, torch.tensor([0], dtype=x.dtype, device=x.device), grad_output)
     # import pdb; pdb.set_trace()
-    if torch.isnan(grad_output).any():
-      import pdb; pdb.set_trace()
+    # if torch.isnan(grad_output).any():
+    #   import pdb; pdb.set_trace()
     return grad_output, None
-
 
 
 class FLinearQ(torch.autograd.Function):
@@ -415,7 +414,6 @@ class FLinearQ(torch.autograd.Function):
   def forward(x, w, h_out, h_bs, sx, sw):
 
     if quantFWDWgt == 'mem':
-      # only get quantFWDWgt
       mx = 2**(quantWgtStoreBits - 1) - 1
       scale = mx / (2**(quantBits - 1) - 1)
       w = torch.clamp(w, -mx, mx)
@@ -564,13 +562,16 @@ class FLinearQ(torch.autograd.Function):
     n = 2**quantAccBits / 2 - 1
     grad_w = torch.clamp(grad_w, -n, n)
 
-    if torch.isnan(grad_input).any():
-      import pdb; pdb.set_trace()
-    if torch.isnan(grad_w).any():
-      import pdb; pdb.set_trace()
+    # if torch.isnan(grad_input).any():
+    #   import pdb; pdb.set_trace()
+    # if torch.isnan(grad_w).any():
+    #   import pdb; pdb.set_trace()
 
+    # print(grad_output_h2)
+    # print(grad_output_h1)
+    # print('--------')
+    # print(sg1, swh1, sw, sg2, sxh2, sx )
     return grad_input * sg1 * swh1 * sw * 1 / biggest_power2_factor(h_out.shape[0]), grad_w * sg2 * sxh2 * sx * 1 / biggest_power2_factor(h_bs.shape[0]), None, None, None, None
-
 
 
 class Linear_Ours(nn.Linear):
@@ -586,20 +587,9 @@ class Linear_Ours(nn.Linear):
     self.register_buffer('hadamard_bs', torch.tensor(
         make_hadamard(quantBatchSize), dtype=self.weight.dtype))
 
-    # self.lsq_act = Parameter(torch.tensor([1.], dtype=torch.float32))
-    # self.lsq_wgt = Parameter(torch.tensor(
-    #     [self.weight.abs().mean() * 2 / np.sqrt(self.QpW)], dtype=torch.float32))
 
     if quantFWDWgt == 'mem':
-      # if 'backbone' not in uname:
-      #   scale_dyn_range = global_args["init_dyn_scale"]
-      # else:
       scale_dyn_range = global_args["dyn_scale"]
-
-      # DEBUG!!!!
-      # scale_dyn_range = .975
-      # DEBUG!!!!
-
       with torch.no_grad():
 
         mx = self.weight.abs().max() * scale_dyn_range
@@ -609,7 +599,7 @@ class Linear_Ours(nn.Linear):
         mult_scale = mult_mx / (2**(quantBits - 1) - 1)
 
         self.register_buffer('sw', scale * mult_scale)
-        self.weight.data = torch.round(self.weight / (scale + 1e-32))
+        self.weight.data = torch.round(self.weight/(scale+1e-32))
 
   def forward(self, input):
 
@@ -623,14 +613,6 @@ class Linear_Ours(nn.Linear):
       raise Exception('not implemented')
       w_q = lsq(self.weight, self.lsq_wgt, self.QpW, self.QnW)
     elif quantFWDWgt == 'mem':
-      # make sure grad updates
-      # with torch.no_grad():
-      #   tmp_w = torch.clip(
-      #     self.weight, -(2**(quantWgtStoreBits - 1) - 1), (2**(quantWgtStoreBits - 1) - 1))
-      #   tmp_w = torch.round(tmp_w)
-
-      #   self.weight.data = tmp_w
-
       w_q = self.weight
       sw = self.sw
     elif quantFWDWgt == 'noq':
@@ -649,15 +631,6 @@ class Linear_Ours(nn.Linear):
       qinput = UniformQuantizeSawb.apply(
           input, self.c1, self.c2, self.QpA, self.QnA)
     elif quantFWDAct == 'int':
-
-      # qinput, sa = [], []
-      # for i in range(int(np.ceil(input.shape[1]/quantBlockSize))):
-      #   ta, tsa = dynamic_intQ_FWD.apply(input[:,i*quantBlockSize:(i+1)*quantBlockSize])
-      #   qinput.append(ta)
-      #   sa.append(tsa)
-
-      # qinput = torch.cat(qinput, dim=1)
-      # sa = torch.stack(sa)
       
       qinput, sa = dynamic_intQ_FWD.apply(input)
     elif quantFWDAct == 'lsq':
@@ -700,14 +673,7 @@ class Conv2d_Ours(nn.Conv2d):
     self.register_buffer('hadamard_bs', torch.tensor(
         torch.zeros((1, 1)), dtype=self.weight.dtype))
 
-    # self.lsq_act = Parameter(torch.tensor([1.], dtype=torch.float32))
-    # self.lsq_wgt = Parameter(torch.tensor(
-    #     [self.weight.abs().mean() * 2 / np.sqrt(self.QpW)], dtype=torch.float32))
-
     if quantFWDWgt == 'mem':
-      # if 'backbone' not in uname:
-      #   scale_dyn_range = global_args["init_dyn_scale"]
-      # else:
       scale_dyn_range = global_args["dyn_scale"]
       with torch.no_grad():
 
@@ -718,11 +684,10 @@ class Conv2d_Ours(nn.Conv2d):
         mult_scale = mult_mx / (2**(quantBits - 1) - 1)
 
         self.register_buffer('sw', scale * mult_scale)
-        self.weight.data = torch.round(self.weight / (scale + 1e-32))
+        self.weight.data = torch.round(self.weight/(scale+1e-32))
 
   def forward(self, input):
 
-    # if self.quantizeFwd:
     if quantFWDWgt == 'sawb':
       raise Exception('not implemented')
       w_q = UniformQuantizeSawb.apply(
@@ -733,13 +698,6 @@ class Conv2d_Ours(nn.Conv2d):
       raise Exception('not implemented')
       w_q = lsq(self.weight, self.lsq_wgt, self.QpW, self.QnW)
     elif quantFWDWgt == 'mem':
-      # make sure grad updates
-      # with torch.no_grad():
-      #   # tmp_w = torch.clip(self.weight, -(2**(quantWgtStoreBits-1)-1), (2**(quantWgtStoreBits-1)-1))
-      #   # tmp_w = torch.round(tmp_w)
-
-      #   self.weight.data = tmp_w
-
       w_q = self.weight
       sw = self.sw
     elif quantFWDWgt == 'noq':
@@ -779,15 +737,15 @@ class Conv2d_Ours(nn.Conv2d):
       self.hadamard_bs = torch.tensor(make_hadamard(
           qinput.shape[1]), dtype=self.weight.dtype).to(self.weight.device)
 
-    # flinearq_fn = torch.vmap(FLinearQ.apply, randomness='different')
-    # out = flinearq_fn(qinput, w_q.T.unsqueeze(0).repeat(qinput.shape[0], 1, 1), self.hadamard_out.unsqueeze(
-    #     0).repeat(qinput.shape[0], 1, 1), self.hadamard_bs.unsqueeze(0).repeat(qinput.shape[0], 1, 1),
-    #     sa.unsqueeze(0).repeat(qinput.shape[0], 1, 1), sw.unsqueeze(0).repeat(qinput.shape[0], 1, 1))
+    flinearq_fn = torch.vmap(FLinearQ.apply, randomness='different')
+    out = flinearq_fn(qinput, w_q.T.unsqueeze(0).repeat(qinput.shape[0], 1, 1), self.hadamard_out.unsqueeze(
+        0).repeat(qinput.shape[0], 1, 1), self.hadamard_bs.unsqueeze(0).repeat(qinput.shape[0], 1, 1),
+        sa.unsqueeze(0).repeat(qinput.shape[0], 1, 1), sw.unsqueeze(0).repeat(qinput.shape[0], 1, 1))
 
-    out = []
-    for i in range(qinput.shape[0]):
-      out.append(FLinearQ.apply(qinput[i,:], w_q.T, self.hadamard_out, self.hadamard_bs, sa, sw))
-    out = torch.stack(out)
+    # out = []
+    # for i in range(qinput.shape[0]):
+    #   out.append(FLinearQ.apply(qinput[i,:], w_q.T, self.hadamard_out, self.hadamard_bs, sa, sw))
+    # out = torch.stack(out)
 
     # reshaping outputs into image form with batch, channel, height, width
     out = out.transpose(1, 2)

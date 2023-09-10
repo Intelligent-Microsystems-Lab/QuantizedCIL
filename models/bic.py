@@ -94,9 +94,9 @@ class BiC(BaseLearner):
     )
 
     self._log_bias_params()
-    self._stage1_training(self.train_loader, self.test_loader)
+    self._stage1_training(self.train_loader, self.test_loader, data_manager)
     if self._cur_task >= 1:
-      self._stage2_bias_correction(self.val_loader, self.test_loader)
+      self._stage2_bias_correction(self.val_loader, self.test_loader, data_manager)
 
     self.build_rehearsal_memory(data_manager, self.samples_per_class)
 
@@ -104,22 +104,23 @@ class BiC(BaseLearner):
       self._network = self._network.module
     self._log_bias_params()
 
-    if quant.quantTrack:
-      # save grads
-      for gen_stats in ['train_acc', 'test_acc', 'loss']:
-        np.save('track_stats/' + self.date_str + '_' + self.args['dataset'] + '_' + self.args['model_name'] + '_' + str(
-            self._cur_task) + '_' + gen_stats + '.npy', quant.track_stats[gen_stats])
-      for lname in track_layer_list:
-        if lname in quant.track_stats['grads']:
-          np.save('track_stats/' + self.date_str + '_' + self.args['dataset'] + '_' + self.args['model_name'] + '_' + str(
-              self._cur_task) + lname + '.npy', torch.hstack(quant.track_stats['grads'][lname]).numpy())
-        if lname in quant.track_stats['grads']:
-          for stat_name in ['max', 'min', 'mean', 'norm']:
-            np.save('track_stats/' + self.date_str + '_' + self.args['dataset'] + '_' + self.args['model_name'] + '_' + str(
-                self._cur_task) + lname + '_' + stat_name + '.npy', torch.hstack(quant.track_stats['grad_stats'][lname][stat_name]).numpy())
+    # if quant.quantTrack:
+    #   # save grads
+    #   for gen_stats in ['train_acc', 'test_acc', 'loss']:
+    #     np.save('track_stats/' + self.date_str + '_' + self.args['dataset'] + '_' + self.args['model_name'] + '_' + str(
+    #         self._cur_task) + '_' + gen_stats + '.npy', quant.track_stats[gen_stats])
+    #   for lname in track_layer_list:
+    #     if lname in quant.track_stats['grads']:
+    #       np.save('track_stats/' + self.date_str + '_' + self.args['dataset'] + '_' + self.args['model_name'] + '_' + str(
+    #           self._cur_task) + lname + '.npy', torch.hstack(quant.track_stats['grads'][lname]).numpy())
+    #     if lname in quant.track_stats['grads']:
+    #       for stat_name in ['max', 'min', 'mean', 'norm']:
+    #         np.save('track_stats/' + self.date_str + '_' + self.args['dataset'] + '_' + self.args['model_name'] + '_' + str(
+    #             self._cur_task) + lname + '_' + stat_name + '.npy', torch.hstack(quant.track_stats['grad_stats'][lname][stat_name]).numpy())
 
-  def _run(self, train_loader, test_loader, optimizer, scheduler, stage):
+  def _run(self, train_loader, test_loader, optimizer, scheduler, stage, data_manager):
     prog_bar = tqdm(range(self.args['epochs']))
+    gen_cnt = 0
     for _, epoch in enumerate(prog_bar):  # range(1, epochs + 1):
       self._network.train()
       losses = 0.0
@@ -153,6 +154,29 @@ class BiC(BaseLearner):
 
         losses += loss.item()
 
+        # set quant scale update
+        if gen_cnt % self.args["quantUpdateP"] == 0 and gen_cnt > 0:
+          with torch.no_grad():
+            try:
+              mem_samples, mem_targets = self._get_memory()
+            except:
+              mem_samples, mem_targets = np.zeros_like(inputs.cpu()), np.zeros_like(targets.cpu())
+            # get as many samples from the new classes as for each in memory
+            train_copy = data_manager.get_dataset(
+                            np.arange(self._known_classes, self._total_classes),
+                            source="train",
+                            mode="train",
+                            no_trsf = True,
+                            )
+            # with torch.no_grad():
+            #   no_update_perc = { k: np.mean((backup_w[k] == v).cpu().numpy()) for k,v in self._network.named_parameters()}
+            # quant.quant_no_update_perc = no_update_perc
+            quant.balanced_scale_calibration_fwd((mem_samples, mem_targets), train_copy,
+                                           self._known_classes, self._total_classes,
+                                           self._network, inputs.device, data_manager)
+
+        gen_cnt += 1
+
       if epoch % 5 == 0:
         train_acc = self._compute_accuracy(self._network, train_loader)
         test_acc = self._compute_accuracy(self._network, test_loader)
@@ -184,7 +208,7 @@ class BiC(BaseLearner):
       prog_bar.set_description(info)
     logging.info(info)
 
-  def _stage1_training(self, train_loader, test_loader):
+  def _stage1_training(self, train_loader, test_loader, data_manager):
     """
     if self._cur_task == 0:
         loaded_dict = torch.load('./dict_0.pkl')
@@ -247,9 +271,9 @@ class BiC(BaseLearner):
         self._network = nn.DataParallel(self._network, self._multiple_gpus)
     else:
       self._run(train_loader, test_loader, optimizer,
-                scheduler, stage="training")
+                scheduler, stage="training", data_manager = data_manager)
 
-  def _stage2_bias_correction(self, val_loader, test_loader):
+  def _stage2_bias_correction(self, val_loader, test_loader, data_manager):
     if isinstance(self._network, nn.DataParallel):
       self._network = self._network.module
     network_params = [
@@ -288,7 +312,7 @@ class BiC(BaseLearner):
     self._network.to(self._device)
 
     self._run(
-        val_loader, test_loader, optimizer, scheduler, stage="bias_correction"
+        val_loader, test_loader, optimizer, scheduler, stage="bias_correction", data_manager = data_manager
     )
 
   def _log_bias_params(self):

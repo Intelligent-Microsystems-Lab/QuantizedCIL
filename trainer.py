@@ -176,7 +176,7 @@ def _set_device(args):
   gpus = []
 
   for device in device_type:
-    if device_type == -1:
+    if device == -1:
       device = torch.device("cpu")
     else:
       device = torch.device("cuda") # torch.device("cuda:{}".format(device))
@@ -184,7 +184,7 @@ def _set_device(args):
     gpus.append(device)
 
   # gpus.append(torch.device("cuda"))
-
+  # import pdb; pdb.set_trace()
   args["device"] = gpus
   # print(torch.cuda.device_count())
   # print(gpus)
