@@ -48,7 +48,7 @@ def accuracy(y_pred, y_true, nb_old, increment):
   )
 
   cl_acc_dict = {}
-  for cl_id in range(0, np.max(y_true)):
+  for cl_id in range(0, np.max(y_true)+1):
     idxes = np.where(y_true == cl_id)[0]
     if len(idxes) == 0:
       continue

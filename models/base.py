@@ -25,6 +25,7 @@ class BaseLearner(object):
     self._data_memory, self._targets_memory = np.array([]), np.array([])
     self.topk = 5
     self.forgetting = forgetting.Forgetting()
+    self.forgetting_nme = forgetting.Forgetting()
 
     self._memory_size = args["memory_size"]
     self._memory_per_class = args.get("memory_per_class", None)
@@ -84,8 +85,7 @@ class BaseLearner(object):
     try:
       grouped = accuracy(y_pred.T[0], y_true, self._known_classes, self.args['increment'])
     except: 
-      grouped = accuracy(y_pred.T[0], y_true, self._known_classes, self.args['init_cls'],
-                       increment=self.args["increment"])
+      grouped = accuracy(y_pred.T[0], y_true, self._known_classes, self.args['init_cls'],)
     ret["grouped"] = grouped
     ret["top1"] = grouped["total"]
     try:
@@ -99,7 +99,6 @@ class BaseLearner(object):
           ) * 100 / len(y_true),
           decimals=2,
       )
-    self.forgetting(grouped["cl_acc"])
 
     return ret
 
@@ -127,6 +126,11 @@ class BaseLearner(object):
         f.write(
             f"{self.args['time_str']},{self.args['model_name']},{_pred_path},{_target_path} \n")
 
+    self.forgetting(cnn_accy['grouped']["cl_acc"])
+    try:
+      self.forgetting_nme(nme_accy['grouped']["cl_acc"])
+    except:
+      pass
     return cnn_accy, nme_accy
 
   def incremental_train(self):
