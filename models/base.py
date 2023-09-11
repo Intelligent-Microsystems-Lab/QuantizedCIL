@@ -21,7 +21,7 @@ class BaseLearner(object):
     self._known_classes = 0
     self._total_classes = 0
     self._network = None
-    self._eval_ta_network = None
+    self._old_network = None
     self._data_memory, self._targets_memory = np.array([]), np.array([])
     self.topk = 5
     self.forgetting = forgetting.Forgetting()

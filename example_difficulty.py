@@ -27,18 +27,15 @@ def determine_difficulty(model, data_manager, args):
     print(f'eval diff: {i}%')
     tmp_model = copy.deepcopy(model._network)
 
-    import pdb; pdb.set_trace()
-    parameters_to_prune = (
-      (tmp_model.backbone.net[0].lw, 'weight'),
-      (tmp_model.backbone.net[1].lw, 'weight'),
-      (tmp_model.fc, 'weight'),
-    )
+    
+    parameters_to_prune = []
+    for name, module in tmp_model.named_modules():
+      if isinstance(module, torch.nn.Conv2d):
+        parameters_to_prune.append((module, 'weight'))
+      elif isinstance(module, torch.nn.Linear):
+        parameters_to_prune.append((module, 'weight'))
 
-    prune.global_unstructured(
-        parameters_to_prune,
-        pruning_method=prune.L1Unstructured,
-        amount=i/100,
-    )
+    prune.global_unstructured(parameters_to_prune,pruning_method=prune.L1Unstructured,amount=i/100,)
 
     for i, (_, inputs, targets) in enumerate(test_loader):
 
