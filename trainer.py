@@ -14,6 +14,7 @@ from utils.data_manager import DataManager
 from utils.toolkit import ConfigEncoder, count_parameters, save_fc, save_model
 
 import quant
+from example_difficulty import determine_difficulty, what_did_i_forget
 
 
 def train(args):
@@ -172,6 +173,11 @@ def _train(args):
     save_fc(args, model)
   else:
     save_model(args, model)
+
+  if args['example_difficulty']:
+    determine_difficulty(model, data_manager, args)
+  else:
+    what_did_i_forget(model, data_manager, args)
 
 
 def _set_device(args):

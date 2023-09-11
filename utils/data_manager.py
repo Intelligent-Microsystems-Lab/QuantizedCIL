@@ -224,7 +224,6 @@ class DummyDataset(Dataset):
 
 
 def _map_new_class_index(y, order):
-  import pdb; pdb.set_trace()
   translate_dict = {order.index(i):i for i in np.unique(y)}
   return np.array(list(map(lambda x: order.index(x), y))), translate_dict
 
