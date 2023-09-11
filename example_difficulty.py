@@ -27,6 +27,7 @@ def determine_difficulty(model, data_manager, args):
     print(f'eval diff: {i}%')
     tmp_model = copy.deepcopy(model._network)
 
+    import pdb; pdb.set_trace()
     parameters_to_prune = (
       (tmp_model.backbone.net[0].lw, 'weight'),
       (tmp_model.backbone.net[1].lw, 'weight'),

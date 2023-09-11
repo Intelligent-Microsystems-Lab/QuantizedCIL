@@ -40,7 +40,7 @@ def makedirs(path):
     os.makedirs(path)
 
 
-def accuracy(y_pred, y_true, nb_old, increment=10):
+def accuracy(y_pred, y_true, nb_old, increment):
   assert len(y_pred) == len(y_true), "Data length error."
   all_acc = {}
   all_acc["total"] = np.around(
@@ -75,7 +75,6 @@ def accuracy(y_pred, y_true, nb_old, increment=10):
   all_acc["new"] = np.around(
       (y_pred[idxes] == y_true[idxes]).sum() * 100 / len(idxes), decimals=2
   )
-
   return all_acc
 
 
