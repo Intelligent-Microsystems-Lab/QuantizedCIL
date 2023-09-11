@@ -98,22 +98,12 @@ class Dense_Ours(Module):
         inputs, kernel, bias, dtype=self.dtype)
 
     h1 = self.variable('batch_stats', 'h1', make_hadamard, self.features)
-    h2 = self.variable('batch_stats', 'h2', make_hadamard, inputs.shape[0])
+    h2 = self.variable('batch_stats', 'h2', make_hadamard, inputs.shape[0]) 
 
     rng = self.make_rng('stoch')
 
     y = flinearq(inputs, kernel, h1.value, h2.value, rng)
 
-    # if self.dot_general_cls is not None:
-    #   dot_general = self.dot_general_cls()
-    # else:
-    #   dot_general = self.dot_general
-    # y = dot_general(
-    #     inputs,
-    #     kernel,
-    #     (((inputs.ndim - 1,), (0,)), ((), ())),
-    #     precision=self.precision,
-    # )
     if bias is not None:
       y += jnp.reshape(bias, (1,) * (y.ndim - 1) + (-1,))
     return y

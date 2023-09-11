@@ -23,6 +23,8 @@ from typing import Any, Callable, Sequence, Tuple
 from flax import linen as nn
 import jax.numpy as jnp
 
+from qlayers import Dense_Ours, Conv_Ours
+
 ModuleDef = Any
 
 
@@ -95,7 +97,7 @@ class ResNet(nn.Module):
   num_filters: int = 64
   dtype: Any = jnp.float32
   act: Callable = nn.relu
-  conv: ModuleDef = nn.Conv
+  conv: ModuleDef = Conv_Ours
 
   @nn.compact
   def __call__(self, x, train: bool = True):
@@ -130,7 +132,7 @@ class ResNet(nn.Module):
             act=self.act,
         )(x)
     x = jnp.mean(x, axis=(1, 2))
-    x = nn.Dense(self.num_classes, dtype=self.dtype)(x)
+    x = Dense_Ours(self.num_classes, dtype=self.dtype)(x)
     x = jnp.asarray(x, self.dtype)
     return x
 

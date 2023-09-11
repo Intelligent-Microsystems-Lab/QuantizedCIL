@@ -1,9 +1,10 @@
 import jax.numpy as jnp
 import math
+import numpy as np
 import scipy
 
 
-def hadamard(n, dtype=int):
+def hadamard(n, dtype=np.int8):
   # from https://github.com/scipy/scipy/blob/v1.11.1/scipy/\
   # linalg/_special_matrices.py#L319-L373
 
@@ -34,6 +35,7 @@ def biggest_power2_factor(n):
 
 
 def make_hadamard(size_m):
-  biggest_pow2 = biggest_power2_factor(size_m)
-  return scipy.linalg.block_diag(
-      *[hadamard(biggest_pow2)] * int(size_m / biggest_pow2))
+  return jnp.eye(size_m)
+  # biggest_pow2 = biggest_power2_factor(size_m)
+  # return scipy.linalg.block_diag(
+  #     *[hadamard(biggest_pow2)] * int(size_m / biggest_pow2))
