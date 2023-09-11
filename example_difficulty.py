@@ -16,6 +16,14 @@ def determine_difficulty(model, data_manager, args):
         num_workers=args['num_workers']
     )
 
+  train_dataset = data_manager.get_dataset(
+        np.arange(0,  len(np.unique(data_manager._train_targets))), source="train", mode="train"
+    )
+  train_loader = DataLoader(
+        test_dataset, batch_size=args['batch_size'], shuffle=False,
+        num_workers=args['num_workers']
+    )
+
   diff_dict = {}
 
   for i, (_, inputs, targets) in enumerate(test_loader):
@@ -38,6 +46,18 @@ def determine_difficulty(model, data_manager, args):
     prune.global_unstructured(parameters_to_prune,pruning_method=prune.L1Unstructured,amount=i/100,)
 
     for i, (_, inputs, targets) in enumerate(test_loader):
+
+      inputs, targets = inputs.to(model._device), targets.to(model._device)
+      logits = tmp_model(inputs)["logits"]
+
+      _, preds = torch.max(logits, dim=1)
+      local_correct = preds.eq(targets.expand_as(preds)) # .cpu().sum()
+
+      for idx, j in enumerate(local_correct):
+        if j:
+          diff_dict['_'.join([f'{x}' for x in inputs[idx]])] = i
+
+    for i, (_, inputs, targets) in enumerate(train_loader):
 
       inputs, targets = inputs.to(model._device), targets.to(model._device)
       logits = tmp_model(inputs)["logits"]
