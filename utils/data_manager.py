@@ -157,20 +157,23 @@ class DataManager(object):
     self._common_trsf = idata.common_trsf
 
     # Order
-    order = [i for i in range(len(np.unique(self._train_targets)))]
+    # order = [i for i in range(len(np.unique(self._train_targets)))]
+    #TODO is this correct?
+    order = [i for i in np.unique(self._train_targets)]
     if shuffle:
       np.random.seed(seed)
-      order = np.random.permutation(len(order)).tolist()
+      # order = np.random.permutation(len(order)).tolist()
+      order = np.random.permutation(order).tolist()
     else:
       order = idata.class_order
     self._class_order = order
     logging.info(self._class_order)
 
     # Map indices
-    self._train_targets = _map_new_class_index(
+    self._train_targets, self.translate_dict = _map_new_class_index(
         self._train_targets, self._class_order
     )
-    self._test_targets = _map_new_class_index(
+    self._test_targets, _ = _map_new_class_index(
         self._test_targets, self._class_order)
 
   def _select(self, x, y, low_range, high_range):
@@ -221,7 +224,9 @@ class DummyDataset(Dataset):
 
 
 def _map_new_class_index(y, order):
-  return np.array(list(map(lambda x: order.index(x), y)))
+  import pdb; pdb.set_trace()
+  translate_dict = {order.index(i):i for i in np.unique(y)}
+  return np.array(list(map(lambda x: order.index(x), y))), translate_dict
 
 
 def _get_idata(dataset_name):

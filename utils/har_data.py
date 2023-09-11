@@ -8,7 +8,7 @@ import random
 from utils import utils
 
 
-def get_hapt(remove_bad=True):
+def get_hapt(remove_bad=False):
   class_name_translator = {1: "walking", 2: "walking upstairs",
                            3: "walking downstairs", 4: "sitting",
                            5: "standing", 6: "laying", 7: "stand to sit",
@@ -30,7 +30,7 @@ def get_hapt(remove_bad=True):
   return df, person_column, label_pos, class_name_translator
 
 
-def get_pamap(remove_bad=True):
+def get_pamap(remove_bad=False):
   class_name_translator = {1: "lying", 2: "sitting", 3: "standing",
                            4: "walking", 5: "running", 6: "cycling",
                            7: "Nordic walking", 9: "watching TV",
@@ -121,15 +121,16 @@ def get_wisdm():
   return df, person_column, label_pos, class_name_translator
 
 
-def get_data(d_name, TEST_SIZE, delete_class_column=False, user_test_set_size=0):
+def get_data(d_name, TEST_SIZE, delete_class_column=False, user_test_set_size=0,
+             remove_bad=False):
   if d_name.lower() == "wisdm":
     df, person_column, label_pos, class_name_translator = get_wisdm()
   elif d_name.lower() == "dsads":
     df, person_column, label_pos, class_name_translator = get_dsads()
   elif d_name.lower() == "pamap":
-    df, person_column, label_pos, class_name_translator = get_pamap()
+    df, person_column, label_pos, class_name_translator = get_pamap(remove_bad)
   elif d_name.lower() == "hapt":
-    df, person_column, label_pos, class_name_translator = get_hapt()
+    df, person_column, label_pos, class_name_translator = get_hapt(remove_bad)
   else:
     raise ValueError(f"Dataset {d_name} not found.")
 
@@ -261,10 +262,13 @@ def make_lbls_continous(labels):
   return labels
 
 
-def get_features_labels_users_from_df(df, label_col, user_col):
+def get_features_labels_users_from_df(df, label_col, user_col,
+                                      make_continous=True, start_from_zero=True):
   label_data = df[label_col].values
-  label_data = make_lbls_continous(label_data)
-  label_data = start_labels_at_zero(label_data)
+  if make_continous:
+    label_data = make_lbls_continous(label_data)
+  if start_from_zero:
+    label_data = start_labels_at_zero(label_data)
   user_data = df[user_col].values
   features = df.drop(columns=[label_col, user_col]).values.astype(np.float32)
   return features, label_data, user_data

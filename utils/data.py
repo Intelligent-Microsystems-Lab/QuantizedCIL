@@ -167,10 +167,14 @@ class iDSADS(iData):
                                                                  user_test_set_size=0)
     features, labels, _ = har_data.get_features_labels_users_from_df(train_df,
                                                                      label_pos,
-                                                                     "USER")
+                                                                     "USER",
+                                                                     make_continous=False,
+                                                                     start_from_zero=False)
     test_features, test_labels, _ = har_data.get_features_labels_users_from_df(test_df,
                                                                                label_pos,
-                                                                               "USER")
+                                                                               "USER",
+                                                                               make_continous=False,
+                                                                               start_from_zero=False)
     self.train_data, self.train_targets = features, labels
     self.test_data, self.test_targets = test_features, test_labels
 
@@ -182,13 +186,19 @@ class iPAMAP(iData):
   def org_data(self):
     train_df, test_df, _, _, _, label_pos, _ = har_data.get_data("pamap", 0.2,
                                                                  delete_class_column=False,
-                                                                 user_test_set_size=0)
+                                                                 user_test_set_size=0,
+                                                                 remove_bad=True)
     features, labels, _ = har_data.get_features_labels_users_from_df(train_df,
                                                                      label_pos,
-                                                                     "USER")
+                                                                     "USER",
+                                                                     make_continous=False,
+                                                                     start_from_zero=False)
+    self.class_order = np.unique(labels).tolist()
     test_features, test_labels, _ = har_data.get_features_labels_users_from_df(test_df,
                                                                                label_pos,
-                                                                               "USER")
+                                                                               "USER",
+                                                                               make_continous=False,
+                                                                               start_from_zero=False)
     self.train_data, self.train_targets = features, labels
     self.test_data, self.test_targets = test_features, test_labels
 
@@ -200,13 +210,20 @@ class iHAPT(iData):
   def org_data(self):
     train_df, test_df, _, _, _, label_pos, _ = har_data.get_data("hapt", 0.2,
                                                                  delete_class_column=False,
-                                                                 user_test_set_size=0)
+                                                                 user_test_set_size=0,
+                                                                 remove_bad=True)
     features, labels, _ = har_data.get_features_labels_users_from_df(train_df,
                                                                      label_pos,
-                                                                     "USER")
+                                                                     "USER",
+                                                                     make_continous=False,
+                                                                     start_from_zero=False
+                                                                     )
+    self.class_order = np.unique(labels).tolist()
     test_features, test_labels, _ = har_data.get_features_labels_users_from_df(test_df,
                                                                                label_pos,
-                                                                               "USER")
+                                                                               "USER",
+                                                                               make_continous=False,
+                                                                               start_from_zero=False)
     self.train_data, self.train_targets = features, labels
     self.test_data, self.test_targets = test_features, test_labels
 
@@ -221,9 +238,13 @@ class iWISDM(iData):
                                                                  user_test_set_size=0)
     features, labels, _ = har_data.get_features_labels_users_from_df(train_df,
                                                                      label_pos,
-                                                                     "USER")
+                                                                     "USER",
+                                                                     make_continous=False,
+                                                                     start_from_zero=False)
     test_features, test_labels, _ = har_data.get_features_labels_users_from_df(test_df,
                                                                                label_pos,
-                                                                               "USER")
+                                                                               "USER",
+                                                                               make_continous=False,
+                                                                               start_from_zero=False)
     self.train_data, self.train_targets = features, labels
     self.test_data, self.test_targets = test_features, test_labels
