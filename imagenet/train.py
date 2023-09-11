@@ -58,14 +58,16 @@ def create_model(*, model_cls, half_precision, **kwargs):
   return model_cls(num_classes=NUM_CLASSES, dtype=model_dtype, **kwargs)
 
 
-def initialized(key, image_size, model):
-  input_shape = (1, image_size, image_size, 3)
+def initialized(key, image_size, model, bs):
+  input_shape = (bs, image_size, image_size, 3)
 
   @jax.jit
   def init(*args):
     return model.init(*args)
 
-  variables = init({'params': key}, jnp.ones(input_shape, model.dtype))
+  key, skey = jax.random.split(key, 2)
+
+  variables = init({'params': key, 'stoch': skey}, jnp.ones(input_shape, model.dtype))
   return variables['params'], variables['batch_stats']
 
 
@@ -109,7 +111,7 @@ def create_learning_rate_fn(
   return schedule_fn
 
 
-def train_step(state, batch, learning_rate_fn):
+def train_step(rng, state, batch, learning_rate_fn,):
   """Perform a single training step."""
 
   def loss_fn(params):
@@ -117,7 +119,7 @@ def train_step(state, batch, learning_rate_fn):
     logits, new_model_state = state.apply_fn(
         {'params': params, 'batch_stats': state.batch_stats},
         batch['image'],
-        mutable=['batch_stats'],
+        mutable=['batch_stats'], rngs = {'stoch': rng}
     )
     loss = cross_entropy_loss(logits, batch['label'])
     weight_penalty_params = jax.tree_util.tree_leaves(params)
@@ -171,10 +173,10 @@ def train_step(state, batch, learning_rate_fn):
   return new_state, metrics
 
 
-def eval_step(state, batch):
+def eval_step(state, batch, rng):
   variables = {'params': state.params, 'batch_stats': state.batch_stats}
   logits = state.apply_fn(
-      variables, batch['image'], train=False, mutable=False)
+      variables, batch['image'], train=False, mutable=False, rngs={'stoch':rng})
   return compute_metrics(logits, batch['label'])
 
 
@@ -257,7 +259,7 @@ def create_train_state(
   else:
     dynamic_scale = None
 
-  params, batch_stats = initialized(rng, image_size, model)
+  params, batch_stats = initialized(rng, image_size, model, config.batch_size * len(jax.devices()))
   tx = optax.sgd(
       learning_rate=learning_rate_fn,
       momentum=config.momentum,
@@ -290,7 +292,7 @@ def train_and_evaluate(
       logdir=workdir, just_logging=jax.process_index() != 0
   )
 
-  rng = random.PRNGKey(0)
+  rng = random.PRNGKey(42)
 
   image_size = 224
 
@@ -308,7 +310,7 @@ def train_and_evaluate(
   else:
     input_dtype = tf.float32
 
-  dataset_builder = tfds.builder(config.dataset)
+  dataset_builder = tfds.builder(config.dataset, data_dir='gs://imagenet_clemens/tensorflow_datasets')
   train_iter = create_input_iter(
       dataset_builder,
       local_batch_size,
@@ -360,7 +362,8 @@ def train_and_evaluate(
       config, base_learning_rate, steps_per_epoch
   )
 
-  state = create_train_state(rng, config, model, image_size, learning_rate_fn)
+  rng, key = jax.random.split(rng, 2)
+  state = create_train_state(key, config, model, image_size, learning_rate_fn)
   state = restore_checkpoint(state, workdir)
   # step_offset > 0 if restarting from checkpoint
   step_offset = int(state.step)
@@ -379,7 +382,10 @@ def train_and_evaluate(
   train_metrics_last_t = time.time()
   logging.info('Initial compilation, this might take some minutes...')
   for step, batch in zip(range(step_offset, num_steps), train_iter):
-    state, metrics = p_train_step(state, batch)
+    keys = jax.random.split(rng, len(jax.devices()) + 1)
+    rng = keys[0]
+
+    state, metrics = p_train_step(keys[1:], state, batch,)
     for h in hooks:
       h(step)
     if step == step_offset:
@@ -409,8 +415,11 @@ def train_and_evaluate(
       # sync batch statistics across replicas
       state = sync_batch_stats(state)
       for _ in range(steps_per_eval):
+        keys = jax.random.split(rng, len(jax.devices()) + 1)
+        rng = keys[0]
+
         eval_batch = next(eval_iter)
-        metrics = p_eval_step(state, eval_batch)
+        metrics = p_eval_step(state, eval_batch, keys[1:])
         eval_metrics.append(metrics)
       eval_metrics = common_utils.get_metrics(eval_metrics)
       summary = jax.tree_util.tree_map(lambda x: x.mean(), eval_metrics)

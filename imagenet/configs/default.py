@@ -35,7 +35,7 @@ def get_config():
   config = ml_collections.ConfigDict()
 
   # As defined in the `models` module.
-  config.model = 'ResNet50'
+  config.model = 'ResNet18'
   # `name` argument of tensorflow_datasets.builder()
   config.dataset = 'imagenet2012:5.*.*'
 
