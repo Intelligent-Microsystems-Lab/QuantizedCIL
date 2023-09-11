@@ -2,7 +2,7 @@ import os
 import numpy as np
 import torch
 import json
-
+best_cl_accs = {}
 
 class ConfigEncoder(json.JSONEncoder):
   def default(self, o):
@@ -40,12 +40,23 @@ def makedirs(path):
     os.makedirs(path)
 
 
-def accuracy(y_pred, y_true, nb_old, increment=10):
+def accuracy(y_pred, y_true, nb_old, increment):
   assert len(y_pred) == len(y_true), "Data length error."
   all_acc = {}
   all_acc["total"] = np.around(
       (y_pred == y_true).sum() * 100 / len(y_true), decimals=2
   )
+
+  cl_acc_dict = {}
+  for cl_id in range(0, np.max(y_true)):
+    idxes = np.where(y_true == cl_id)[0]
+    if len(idxes) == 0:
+      continue
+    cl_acc_dict[cl_id] = np.around(
+        (y_pred[idxes] == y_true[idxes]).sum() * 100 / len(idxes), decimals=2
+    )
+  all_acc["cl_acc"] = cl_acc_dict
+
 
   # Grouped accuracy
   for class_id in range(0, np.max(y_true), increment):
@@ -77,6 +88,15 @@ def accuracy(y_pred, y_true, nb_old, increment=10):
   )
 
   return all_acc
+
+
+def forgetting(cl, cl_acc):
+  global best_cl_accs
+
+  if cl not in best_cl_accs:
+    best_cl_accs[cl] = cl_acc
+  else:
+    best_cl_accs[cl] = max(best_cl_accs[cl], cl_acc)
 
 
 def split_images_labels(imgs):

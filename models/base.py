@@ -8,6 +8,8 @@ from utils.toolkit import tensor2numpy, accuracy
 from scipy.spatial.distance import cdist
 import os
 
+from utils import forgetting
+
 EPSILON = 1e-8
 batch_size = 64
 
@@ -19,9 +21,10 @@ class BaseLearner(object):
     self._known_classes = 0
     self._total_classes = 0
     self._network = None
-    self._old_network = None
+    self._eval_ta_network = None
     self._data_memory, self._targets_memory = np.array([]), np.array([])
     self.topk = 5
+    self.forgetting = forgetting.Forgetting()
 
     self._memory_size = args["memory_size"]
     self._memory_per_class = args.get("memory_per_class", None)
@@ -78,7 +81,8 @@ class BaseLearner(object):
 
   def _evaluate(self, y_pred, y_true):
     ret = {}
-    grouped = accuracy(y_pred.T[0], y_true, self._known_classes)
+    grouped = accuracy(y_pred.T[0], y_true, self._known_classes,
+                       increment=self.args["increment"])
     ret["grouped"] = grouped
     ret["top1"] = grouped["total"]
     try:
@@ -92,6 +96,8 @@ class BaseLearner(object):
           ) * 100 / len(y_true),
           decimals=2,
       )
+    self.forgetting(grouped["cl_acc"])
+
     return ret
 
   def eval_task(self, save_conf=False):
