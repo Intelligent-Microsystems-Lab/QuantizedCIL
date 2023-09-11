@@ -163,6 +163,8 @@ def setup_parser():
   parser.add_argument('--dyn_scale', type=float, default=2.0)
   parser.add_argument('--quantile', type=float, default=0.975)
 
+  parser.add_argument('--example_difficulty', action="store_true")
+
   return parser
 
 
