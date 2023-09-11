@@ -215,6 +215,8 @@ def place_quant(m, lin_w, lin_b, c_path='',):
 
 def balanced_scale_calibration_fwd(memory_tuple, train_set_copy, known_cl,
                                    total_cl, model, device, data_manager, replay = True):
+  if quantFWDWgt != 'mem':
+    return
   
   global quantUpdateScalePhase
   quantUpdateScalePhase = True
