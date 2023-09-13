@@ -96,13 +96,46 @@ class QuantMomentumOptimizer(torch.optim.Optimizer):
           #   self.layer_lr[p] *= 1.1
           #   # p.data -=  (torch.bernoulli(torch.ones_like(p.data) * .5) * 2 - 1 ) * torch.bernoulli(torch.ones_like(p.data) * .5)
           # else:
+
+          # def w4_fn(w):
+          #   mx = 2**(quantWgtStoreBits - 1) 
+          #   scale = mx / (2**(quantBits - 1))
+          #   w = torch.clamp(w, -mx+1, mx-1)
+          #   w = torch.round(w / (scale + 1e-32))
+          #   return w
+
+          # w4_before = w4_fn(p.data)  
+
+
           p.data -= self.layer_lr[p] * p.grad.data
 
-          p.data = torch.clip(
-              p.data, -(2**(quantWgtStoreBits - 1) - 1), (2**(quantWgtStoreBits - 1) - 1))
-          p.data = torch.round(p.data)
+          def dynamic_intQ2(x, scale=None):
+            # can only be used in BWD - not differentiable
+            # torch.quantile(x.abs(), .99) # TODO optimize calibration
+            if scale is None:
+              scale = 1 # global_args["quantile"]
+            mx = x.abs().max() * scale
+            scale = mx / (2**(quantWgtStoreBits - 1) - 1)
+            x = torch.clamp(x, -mx, mx)
+            # epsilion for vmap # TODO eps size?
+            return torch.round(x / (scale + 1e-32)) * scale
 
-          # import pdb; pdb.set_trace()
+          p.data = dynamic_intQ2(p.data)
+
+          # p.data = torch.clip(
+          #     p.data, -(2**(quantWgtStoreBits - 1) - 1), (2**(quantWgtStoreBits - 1) - 1))
+          # p.data = torch.round(p.data)
+
+
+          # w4_after = w4_fn(p.data)
+
+          # scale = (2**(quantWgtStoreBits-1)) / (2**(quantBits-1))
+
+          # # import pdb; pdb.set_trace()
+          # p.data = torch.where(w4_after > w4_before, w4_fn(p.data)*scale, p.data)
+          # p.data = torch.where(w4_after < w4_before, w4_fn(p.data)*scale, p.data)
+
+          
 
           # if quantUpdateScalePhase:
           #   scale_library[current_uname] = (int(torch.sum(output == 0.))/np.prod(output.shape),
@@ -416,9 +449,9 @@ class FLinearQ(torch.autograd.Function):
   def forward(x, w, h_out, h_bs, sx, sw):
 
     if quantFWDWgt == 'mem':
-      mx = 2**(quantWgtStoreBits - 1) - 1
-      scale = mx / (2**(quantBits - 1) - 1)
-      w = torch.clamp(w, -mx, mx)
+      mx = 2**(quantWgtStoreBits - 1) 
+      scale = mx / (2**(quantBits - 1) )
+      w = torch.clamp(w, -mx-1, mx-1)
       w = torch.round(w / (scale + 1e-32))
 
 

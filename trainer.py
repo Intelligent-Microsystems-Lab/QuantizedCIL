@@ -177,6 +177,7 @@ def _train(args):
 
   if args['example_difficulty']:
     determine_difficulty(model, data_manager, args)
+    # what_did_i_forget(model, data_manager, args)
   else:
     what_did_i_forget(model, data_manager, args)
 

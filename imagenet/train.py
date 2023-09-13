@@ -42,6 +42,9 @@ import tensorflow_datasets as tfds
 import input_pipeline
 import models
 
+# from jax import config
+# config.update("jax_disable_jit", True)
+# jax.config.update('jax_platform_name', 'cpu')
 
 NUM_CLASSES = 1000
 

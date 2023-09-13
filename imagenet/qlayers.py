@@ -284,9 +284,7 @@ class Conv_Ours(Module):
     else:
       bias = None
 
-    h1 = self.variable('batch_stats', 'h1', make_hadamard, self.features)
-    h2 = self.variable('batch_stats', 'h2', make_hadamard,
-                       inputs.shape[1] * inputs.shape[2])
+    
 
     inputs, kernel, bias = promote_dtype(
         inputs, kernel, bias, dtype=self.dtype)
@@ -310,6 +308,9 @@ class Conv_Ours(Module):
                                              precision=self.precision,)
       qinputs = jnp.reshape(qinputs, (qinputs.shape[0], -1, qinputs.shape[-1]))
 
+      h1 = self.variable('batch_stats', 'h1', make_hadamard, self.features)
+      h2 = self.variable('batch_stats', 'h2', make_hadamard, qinputs.shape[1])
+
       h1_exp = jnp.repeat(jnp.expand_dims(h1.value, 0),
                           qinputs.shape[0], axis=0)
       h2_exp = jnp.repeat(jnp.expand_dims(h2.value, 0),
@@ -318,8 +319,7 @@ class Conv_Ours(Module):
       rng = self.make_rng('stoch')
       rng = jax.random.split(rng, qinputs.shape[0])
 
-      y = jax.vmap(flinearq)(qinputs, jnp.repeat(jnp.expand_dims(
-          w_q, 0), qinputs.shape[0], axis=0), h1_exp, h2_exp, rng)
+      y = jax.vmap(flinearq)(qinputs, jnp.repeat(jnp.expand_dims(w_q, 0), qinputs.shape[0], axis=0), h1_exp, h2_exp, rng)
 
       y = jnp.reshape(y, (y.shape[0], int(
           inputs.shape[1] / strides[0]), int(inputs.shape[2] / strides[1]),

@@ -5,6 +5,9 @@ from torch.utils.data import DataLoader
 import copy
 import pickle
 import logging
+from backbones.linears import SimpleLinear
+
+import hashlib
 
 def determine_difficulty(model, data_manager, args):
 
@@ -17,19 +20,28 @@ def determine_difficulty(model, data_manager, args):
     )
 
   train_dataset = data_manager.get_dataset(
-        np.arange(0,  len(np.unique(data_manager._train_targets))), source="train", mode="train"
+        np.arange(0,  len(np.unique(data_manager._train_targets))), source="train", mode="test"
     )
+
   train_loader = DataLoader(
-        test_dataset, batch_size=args['batch_size'], shuffle=False,
+        train_dataset, batch_size=args['batch_size'], shuffle=False,
         num_workers=args['num_workers']
     )
-
   diff_dict = {}
-
+  gen_cnt = 0
   for i, (_, inputs, targets) in enumerate(test_loader):
     for j in inputs:
-      diff_dict['_'.join([f'{x}' for x in j])] = -1
+      # if hashlib.sha512(j.cpu().numpy()).hexdigest() in diff_dict:
+      #   print(hashlib.sha512(j.cpu().numpy()).hexdigest())
+      diff_dict[hashlib.sha512(j.cpu().numpy()).hexdigest()] = -1
+      gen_cnt += 1
 
+  for i, (_, inputs, targets) in enumerate(train_loader):
+    for j in inputs:
+      # if hashlib.sha512(j.cpu().numpy()).hexdigest() in diff_dict:
+      #   print(hashlib.sha512(j.cpu().numpy()).hexdigest())
+      diff_dict[hashlib.sha512(j.cpu().numpy()).hexdigest()] = -1
+      gen_cnt += 1
 
   for i in range(101):
     print(f'eval diff: {i}%')
@@ -41,6 +53,8 @@ def determine_difficulty(model, data_manager, args):
       if isinstance(module, torch.nn.Conv2d):
         parameters_to_prune.append((module, 'weight'))
       elif isinstance(module, torch.nn.Linear):
+        parameters_to_prune.append((module, 'weight'))
+      elif isinstance(module, SimpleLinear):
         parameters_to_prune.append((module, 'weight'))
 
     prune.global_unstructured(parameters_to_prune,pruning_method=prune.L1Unstructured,amount=i/100,)
@@ -55,7 +69,7 @@ def determine_difficulty(model, data_manager, args):
 
       for idx, j in enumerate(local_correct):
         if j:
-          diff_dict['_'.join([f'{x}' for x in inputs[idx]])] = i
+          diff_dict[hashlib.sha512(j.cpu().numpy()).hexdigest()] = i
 
     for i, (_, inputs, targets) in enumerate(train_loader):
 
@@ -67,8 +81,9 @@ def determine_difficulty(model, data_manager, args):
 
       for idx, j in enumerate(local_correct):
         if j:
-          diff_dict['_'.join([f'{x}' for x in inputs[idx]])] = i
+          diff_dict[hashlib.sha512(j.cpu().numpy()).hexdigest()] = i
 
+    # import pdb; pdb.set_trace()
   with open(f'saved_dictionary_{data_manager.dataset_name}.pkl', 'wb') as f:
     pickle.dump(diff_dict, f)
 
@@ -101,9 +116,9 @@ def what_did_i_forget(model, data_manager, args):
 
     for idx, j in enumerate(local_correct):
       if not j:
-        uid = '_'.join([f'{x}' for x in inputs[idx]])
+        uid = hashlib.sha512(inputs[idx].cpu().numpy()).hexdigest()
         if diff_dict[uid] != -1:
           score += diff_dict[uid]
           cnt += 1
 
-  logging.info(f'Our quality lost score: {score/cnt}')
+  logging.info(f'Our quality lost score: {score/(cnt+1e32)}')

@@ -248,5 +248,44 @@ class UnitTestCustomQuantLayer(Benchmark):
     })
 
 
+  def test_eq_conv_stride2_bwd(self):
+    key = jax.random.PRNGKey(8627169)
+
+    key, subkey1, subkey2 = jax.random.split(key, 3)
+    variables = Conv_Ours(16, (3, 3), strides=(2,2)).init(
+        {'params': subkey1, 'stoch': subkey2}, jnp.zeros((128, 32, 32, 3)))
+
+    key, subkey1, subkey2 = jax.random.split(key, 3)
+    data = jax.random.normal(subkey1, (128, 32, 32, 3),)
+    targets = jax.random.normal(subkey2, (128, 16, 16, 16),)
+
+    def loss_fn1(w):
+      x = nn.Conv(16, (3, 3), strides=(2,2)).apply(
+          {'params': w}, inputs=data, rngs={'stoch': subkey2})
+      return jnp.mean((x - targets)**2)
+
+    def loss_fn2(w):
+      x = Conv_Ours(16, (3, 3), strides=(2,2)).apply(
+          {'params': w, 'batch_stats': variables['batch_stats']}, inputs=data,
+          rngs={'stoch': subkey2})
+      return jnp.mean((x - targets)**2)
+
+    g1 = jax.grad(loss_fn1)(variables['params'])
+
+    start_time = time.time()
+    g2 = jax.grad(loss_fn2)(variables['params'])
+    benchmark_time = time.time() - start_time
+
+    np.testing.assert_allclose(
+        g1['kernel'], g2['kernel'], rtol=1e-5, atol=1e-7)
+
+    self.report_wall_time(benchmark_time)
+    self.report_extras({
+        'description': 'bwd conv custom quant conv against flax standard.',
+        'model_name': 'conv',
+        'parameters': 'features=64,kernel_size=(3,3)',
+    })
+
+
 if __name__ == '__main__':
   absltest.main()

@@ -2,7 +2,7 @@
 # Author: Clemens JS Schaefer | Martin Schiemer
 # Quantized training.
 
-
+import jax
 import jax.numpy as jnp
 from jax import custom_vjp
 
@@ -18,6 +18,10 @@ quantBlockSize = 32
 
 @custom_vjp
 def flinearq(x, w, h1, h2, rng):
+  # print('-----')
+  # print(h2.shape)
+  # print(x.shape[0])
+  # print(w.shape[1])
   return jnp.dot(x, w)
 
 

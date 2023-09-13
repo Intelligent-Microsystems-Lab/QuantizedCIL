@@ -1,7 +1,7 @@
+import jax
 import jax.numpy as jnp
 import math
 import numpy as np
-import scipy
 
 
 def hadamard(n, dtype=np.int8):
@@ -35,7 +35,6 @@ def biggest_power2_factor(n):
 
 
 def make_hadamard(size_m):
-  return jnp.eye(size_m)
-  # biggest_pow2 = biggest_power2_factor(size_m)
-  # return scipy.linalg.block_diag(
-  #     *[hadamard(biggest_pow2)] * int(size_m / biggest_pow2))
+  biggest_pow2 = biggest_power2_factor(size_m)
+  return jax.scipy.linalg.block_diag(
+      *[hadamard(biggest_pow2)] * int(size_m / biggest_pow2))
