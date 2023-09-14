@@ -232,7 +232,7 @@ class BiC(BaseLearner):
     ]
     if self.args["optimizer"] == "sgd":
       optimizer = optim.SGD(
-          self._network.parameters(),
+          network_params,
           momentum=0.9,
           lr=self.args['init_lr'],
           weight_decay=self.args['init_weight_decay'],
@@ -285,7 +285,7 @@ class BiC(BaseLearner):
     ]
     if self.args["optimizer"] == "sgd":
       optimizer = optim.SGD(
-          self._network.parameters(),
+          network_params,
           momentum=0.9,
           lr=self.args['lr'],
           weight_decay=self.args['weight_decay'],
