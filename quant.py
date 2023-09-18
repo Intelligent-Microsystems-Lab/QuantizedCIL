@@ -22,6 +22,8 @@ from backbones.linears import SimpleLinear
 from utils.data_manager import DummyDataset
 from torch.utils.data import DataLoader
 
+from luq.LUQ import Conv2d_LUQ, Linear_LUQ
+
 from squant_function import SQuant_func
 
 from hadamard import make_hadamard, biggest_power2_factor
