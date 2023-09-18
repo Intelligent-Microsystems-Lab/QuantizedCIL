@@ -10,6 +10,8 @@ from torch.autograd.function import  Function
 from torch.autograd import Variable
 from torch.autograd.function import InplaceFunction
 
+corrected_version = False
+
 class Conv2d_LUQ(nn.Conv2d):
     """docstring for Conv2d_BF16."""
 
@@ -24,10 +26,17 @@ class Conv2d_LUQ(nn.Conv2d):
         self.abits = 4
         self.wbits = 4
 
-        self.QnW = -2 ** (self.wbits - 1)
-        self.QpW = 2 ** (self.wbits - 1)
-        self.QnA = 0
-        self.QpA = 2 ** self.abits - 1
+        # correction
+        if corrected_version:
+            self.QnW = -(2 ** (self.wbits - 1) -1)
+            self.QpW = 2 ** (self.wbits - 1) - 1
+            self.QnA = 0
+            self.QpA = 2 ** self.abits - 1
+        else:
+            self.QnW = -2 ** (self.wbits - 1)
+            self.QpW = 2 ** (self.wbits - 1)
+            self.QnA = 0
+            self.QpA = 2 ** self.abits - 1
 
         self.register_buffer('init_stateW', torch.zeros(1))
         self.register_buffer('init_stateA', torch.zeros(1))
@@ -35,20 +44,24 @@ class Conv2d_LUQ(nn.Conv2d):
         self.register_buffer('gradScaleW', torch.zeros(1))
         self.register_buffer('gradScaleA', torch.zeros(1))
 
-        self.quantizeFwd = False
-        self.quantizeBwd = False
+        self.quantizeFwd = True
+        self.quantizeBwd = True
 
         self.c1 = 12.1
         self.c2 = 12.2
         self.stochastic = True
         self.repeatBwd = 1
     def forward(self, input):
-
         if self.quantizeFwd:
             w_q = UniformQuantizeSawb.apply(self.weight,self.c1,self.c2,self.QpW,self.QnW)
 
             if torch.min(input) < 0:
-                self.QnA = -2 ** (self.abits - 1)
+                # correction
+                if corrected_version:
+                    self.QnA = -(2 ** (self.abits - 1) -1)
+                    self.QpA = (2 ** (self.abits - 1) -1) 
+                else:
+                    self.QnA = -2 ** (self.abits - 1)
 
             qinput = UniformQuantizeSawb.apply(input,self.c1,self.c2,self.QpA,self.QnA)
 
@@ -79,10 +92,17 @@ class Linear_LUQ(nn.Linear):
         self.abits = 4
         self.wbits = 4
 
-        self.QnW = -2 ** (self.wbits - 1)
-        self.QpW = 2 ** (self.wbits - 1)
-        self.QnA = 0
-        self.QpA = 2 ** self.abits - 1
+        # correction
+        if corrected_version:
+            self.QnW = -(2 ** (self.wbits - 1) -1)
+            self.QpW = 2 ** (self.wbits - 1) - 1
+            self.QnA = 0
+            self.QpA = 2 ** self.abits - 1
+        else:
+            self.QnW = -2 ** (self.wbits - 1)
+            self.QpW = 2 ** (self.wbits - 1)
+            self.QnA = 0
+            self.QpA = 2 ** self.abits - 1
 
         self.register_buffer('init_stateW', torch.zeros(1))
         self.register_buffer('init_stateA', torch.zeros(1))
@@ -90,8 +110,8 @@ class Linear_LUQ(nn.Linear):
         self.register_buffer('gradScaleW', torch.zeros(1))
         self.register_buffer('gradScaleA', torch.zeros(1))
 
-        self.quantizeFwd = False
-        self.quantizeBwd = False
+        self.quantizeFwd = True
+        self.quantizeBwd = True
 
         self.c1 = 12.1
         self.c2 = 12.2
@@ -103,7 +123,12 @@ class Linear_LUQ(nn.Linear):
             w_q = UniformQuantizeSawb.apply(self.weight,self.c1,self.c2,self.QpW,self.QnW)
 
             if torch.min(input) < 0:
-                self.QnA = -2 ** (self.abits - 1)
+                # correction
+                if corrected_version:
+                    self.QnA = -(2 ** (self.abits - 1) -1)
+                    self.QpA = (2 ** (self.abits - 1) -1) 
+                else:
+                    self.QnA = -2 ** (self.abits - 1)
 
             qinput = UniformQuantizeSawb.apply(input,self.c1,self.c2,self.QpA,self.QnA)
 
@@ -154,9 +179,16 @@ class GradStochasticClippingQ(Function):
             out = []
             for i in range(repeatBwd):
 
-                mx = torch.max(grad_output)
+                # correction take max abs
+                if corrected_version:
+                    mx = torch.max(torch.abs(grad_output))
+                else:
+                    mx = torch.max(grad_output)
                 bits = 3
-                alpha = mx / 2**(2**bits-1)
+                if corrected_version:
+                    alpha = mx / 2**(2**bits - 2)
+                else:
+                    alpha = mx / (2**(2**bits-1)-1)
 
                 alphaEps = alpha * torch.rand(grad_output.shape,device=grad_output.device)
 

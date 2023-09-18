@@ -22,7 +22,10 @@ from backbones.linears import SimpleLinear
 from utils.data_manager import DummyDataset
 from torch.utils.data import DataLoader
 
+from luq import LUQ
 from luq.LUQ import Conv2d_LUQ, Linear_LUQ
+import lptorch as lp
+qnn = lp.nn
 
 from squant_function import SQuant_func
 
@@ -184,18 +187,50 @@ def init_properties(obj, uname):
 
   obj.uname = uname
 
+def set_lptorch_quant():
+  df_format = [int(x) for x in list('555555543210')]
+  n_format = [int(x) for x in list('555555543210')]
+  lp.set_activ_quant(lp.quant.quant(lp.quant.custom_fp_format(df_format), room=1, stochastic=False))
+  lp.set_error_quant(lp.quant.quant(lp.quant.custom_fp_format(df_format), room=1, stochastic=True))
+  lp.set_weight_quant(lp.quant.quant(lp.quant.custom_fp_format(n_format), room=0, ch_wise=True))
+  lp.set_grad_quant(lp.quant.quant(lp.quant.custom_fp_format(df_format), room=2, stochastic=True))
+  lp.set_master_quant(lp.quant.quant(lp.quant.fp_format(exp_bit=6, man_bit=9), stochastic=True))
+  lp.set_hysteresis_update(True)
+
+def Conv_FP134(in_channels, out_channels,kernel_size, stride, padding, 
+                  padding_mode, dilation, groups, bias, uname):
+  set_lptorch_quant()
+  return qnn.QLayer(nn.Conv2d(in_channels=in_channels,
+                           out_channels=out_channels,
+                           kernel_size=kernel_size,
+                           stride=stride,
+                           padding=padding,
+                           padding_mode=padding_mode,
+                           dilation=dilation,
+                           groups=groups,
+                           bias=bias), last=True )
+
+def Linear_FP134(in_features, out_features, bias, uname):
+  set_lptorch_quant()
+  return qnn.QLayer(nn.Linear(in_features = in_features, out_features = out_features, bias = bias), last=True, ret_dict = True)
 
 def place_quant(m, lin_w, lin_b, c_path='',):
+  if isinstance(m, qnn.QLayer):
+    return
 
   for attr_str in dir(m):
     if attr_str[:1] != '_':
       target_attr = getattr(m, attr_str)
       if isinstance(target_attr, nn.Conv2d):
         if not hasattr(target_attr, 'c1'):
-          if quantMethod == 'luq':
+          if quantMethod == 'luq_og' or quantMethod == 'luq_corrected':
+            if quantMethod == 'luq_corrected':
+              LUQ.corrected_version = True
             tmp_meth = Conv2d_LUQ
           elif quantMethod == 'ours':
             tmp_meth = Conv2d_Ours
+          elif quantMethod == 'fp134':
+            tmp_meth = Conv_FP134
           else:
             raise Exception('Unknown quant method: ' + quantMethod)
           setattr(m, attr_str,
@@ -212,10 +247,14 @@ def place_quant(m, lin_w, lin_b, c_path='',):
       if isinstance(target_attr, nn.Linear) or isinstance(target_attr,
                                                           SimpleLinear):
         if not hasattr(target_attr, 'c1'):
-          if quantMethod == 'luq':
+          if quantMethod == 'luq_og' or quantMethod == 'luq_corrected':
+            if quantMethod == 'luq_corrected':
+              LUQ.corrected_version = True
             tmp_meth = Linear_LUQ
           elif quantMethod == 'ours':
             tmp_meth = Linear_Ours
+          elif quantMethod == 'fp134':
+            tmp_meth = Linear_FP134
           else:
             raise Exception('Unknown quant method: ' + quantMethod)
 
@@ -241,7 +280,10 @@ def place_quant(m, lin_w, lin_b, c_path='',):
                 # m.fc.sw.data = old_sw * scale_dyn_range
                 m.fc.weight.data = lin_w
             else:
-              m.fc.weight.data = lin_w
+              if quantMethod == 'fp134':
+                m.fc.module.weight.data = lin_w
+              else:
+                m.fc.weight.data = lin_w
           if lin_b is not None and attr_str == 'fc':
             m.fc.bias = nn.Parameter(lin_b)
   for n, ch in m.named_children():

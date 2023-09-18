@@ -90,11 +90,12 @@ class QBlock(torch.nn.Module):
         return qblock_func.apply(inputs[0], inputs[1], scale, self.dual, self.training, self.tracking, self.bn, self.quantize)
 
 class QLayer(torch.nn.Module):
-    def __init__(self, module=None, function=None, dual=[False, False], fixed_scale=[None, None], last=False, tracking=[True, True], quantize=[True, True]):
+    def __init__(self, module=None, function=None, dual=[False, False], fixed_scale=[None, None], last=False, tracking=[True, True], quantize=[True, True], ret_dict = False):
         super().__init__()
         self.module = module
         self.function = function
         self.last = last
+        self.ret_dict = ret_dict
         if isinstance(module, torch.nn.modules.batchnorm._BatchNorm):
             bn = True
         else:
@@ -112,6 +113,8 @@ class QLayer(torch.nn.Module):
             a = self.function(a)
         outputs = self.qblock((a,b))
         if self.last:
+            if self.ret_dict:
+                return {'logits': outputs[0]}
             return outputs[0]
         else:
             return outputs
