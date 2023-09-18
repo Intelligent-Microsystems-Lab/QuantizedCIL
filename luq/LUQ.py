@@ -1,3 +1,6 @@
+# code from https://openreview.net/forum?id=yTbNYYcopd
+# Linear layer added following Conv layer example.
+
 import math
 import torch
 import torch.nn as nn
