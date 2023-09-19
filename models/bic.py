@@ -241,6 +241,18 @@ class BiC(BaseLearner):
           optimizer=optimizer, milestones=self.args['init_milestones'],
           gamma=self.args['init_lr_decay']
       )
+    elif self.args["quantMethod"] == "fp134" or self.args["quantMethod"] == "fp130":
+      optimizer = lp.optim.SGD(
+          self._network.parameters(),
+          momentum=0.9,
+          lr=self.args['init_lr'],
+          weight_decay=self.args['init_weight_decay'],
+          weight_quantize=False
+      )
+      scheduler = optim.lr_scheduler.MultiStepLR(
+          optimizer=optimizer, milestones=self.args['init_milestones'],
+          gamma=self.args['init_lr_decay']
+      )
     elif self.args["optimizer"] == "ours":
       optimizer = quant.QuantMomentumOptimizer(
           self._network.parameters(),

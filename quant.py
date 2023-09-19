@@ -68,6 +68,8 @@ QnA = None
 
 quantGradMxScale = 1.
 
+quantFP134_rep = '555555543210'# '11111110'
+
 scale_library = {}
 
 
@@ -189,13 +191,14 @@ def init_properties(obj, uname):
 
 def set_lptorch_quant():
   df_format = [int(x) for x in list('555555543210')]
-  n_format = [int(x) for x in list('555555543210')]
+  n_format = [int(x) for x in list(quantFP134_rep)]
   lp.set_activ_quant(lp.quant.quant(lp.quant.custom_fp_format(df_format), room=1, stochastic=False))
   lp.set_error_quant(lp.quant.quant(lp.quant.custom_fp_format(df_format), room=1, stochastic=True))
   lp.set_weight_quant(lp.quant.quant(lp.quant.custom_fp_format(n_format), room=0, ch_wise=True))
   lp.set_grad_quant(lp.quant.quant(lp.quant.custom_fp_format(df_format), room=2, stochastic=True))
   lp.set_master_quant(lp.quant.quant(lp.quant.fp_format(exp_bit=6, man_bit=9), stochastic=True))
   lp.set_hysteresis_update(True)
+
 
 def Conv_FP134(in_channels, out_channels,kernel_size, stride, padding, 
                   padding_mode, dilation, groups, bias, uname):
@@ -315,14 +318,11 @@ def balanced_scale_calibration_fwd(memory_tuple, train_set_copy, known_cl,
       for cl in range(known_cl, total_cl):
         mem_targets = np.concatenate([mem_targets, torch.tensor([cl] * new_samples[cl].__len__() )])
 
-      # import pdb; pdb.set_trace()
       new_samples = np.concatenate([np.concatenate(new_samples[key], axis=0) for key in new_samples.keys()], axis=0)
-      # import pdb; pdb.set_trace()
 
       try:
         mem_samples = np.concatenate([mem_samples, new_samples], axis=0)
       except:
-        # import pdb; pdb.set_trace()
         mem_samples = np.reshape(mem_samples, (mem_samples.shape[0], new_samples.shape[1],))
         mem_samples = np.concatenate([mem_samples, new_samples], axis=0)
 
@@ -374,7 +374,6 @@ def update_scale(m, c_path='',):
       if isinstance(target_attr, Linear_Ours): # or isinstance(target_attr,
         if hasattr(target_attr, 'c1'):
           # print(attr_str)
-          # import pdb; pdb.set_trace()
           c_name = c_path + '_' + attr_str
           if scale_library[c_path + '_' + attr_str][1] > quantUpdateHighThr:
             with torch.no_grad():
@@ -420,7 +419,6 @@ def dynamic_stoch(x, scale=1):
   dim = x.shape
   x = x.flatten()
 
-  # import pdb; pdb.set_trace()
   # print(x.abs().max())
   mx = torch.min(x.abs().max(), torch.ones_like(x[0]) * 1e+8) * scale  # torch.quantile(x.abs(), .99) # TODO optimize calibration
   scale = mx / (2**(quantBits - 1) - 1)
@@ -480,9 +478,7 @@ class dynamic_intQ_FWD(Function):
         [0], dtype=x.dtype, device=x.device), grad_output)
     grad_output = torch.where(
         x < -local_mx, torch.tensor([0], dtype=x.dtype, device=x.device), grad_output)
-    # import pdb; pdb.set_trace()
-    # if torch.isnan(grad_output).any():
-    #   import pdb; pdb.set_trace()
+
     return grad_output, None
 
 
@@ -502,37 +498,36 @@ class FLinearQ(torch.autograd.Function):
     global current_uname
     # fin_output = torch.zeros((x.shape[0], w.shape[0])).to(x.device)
 
-    fin_output = 0 * F.linear(x[:,0:quantBlockSize], w[:,0:quantBlockSize])
+    # fin_output = 0 * F.linear(x[:,0:quantBlockSize], w[:,0:quantBlockSize])
 
-    for i in range(int(np.ceil( x.shape[1]/quantBlockSize ))):
-      output = F.linear(x[:,i*quantBlockSize:(i+1)*quantBlockSize], w[:,i*quantBlockSize:(i+1)*quantBlockSize])
-      # requantize to acc BW (clamp to big values - no scale)
-      n = 2**quantAccBits / 2 - 1
-      output = torch.clamp(output, -n, n)
+    # for i in range(int(np.ceil( x.shape[1]/quantBlockSize ))):
+    #   output = F.linear(x[:,i*quantBlockSize:(i+1)*quantBlockSize], w[:,i*quantBlockSize:(i+1)*quantBlockSize])
+    #   # requantize to acc BW (clamp to big values - no scale)
+    #   n = 2**quantAccBits / 2 - 1
+    #   output = torch.clamp(output, -n, n)
 
 
-      if quantUpdateScalePhase and i == 0:
-        global scale_library
+    #   if quantUpdateScalePhase and i == 0:
+    #     global scale_library
         
-        scale_library[current_uname] = (int(torch.sum(output == 0.))/np.prod(output.shape),
-                                        max(int(torch.sum(output == n))/np.prod(output.shape),
-                                            int(torch.sum(output == -n))/np.prod(output.shape)))
+    #     scale_library[current_uname] = (int(torch.sum(output == 0.))/np.prod(output.shape),
+    #                                     max(int(torch.sum(output == n))/np.prod(output.shape),
+    #                                         int(torch.sum(output == -n))/np.prod(output.shape)))
 
-      if quantRelevantMeasurePass and i == 0:
-        # import pdb; pdb.set_trace()
-        if current_uname in track_stats['zeros']:
-          track_stats['zeros'][current_uname].append(torch.sum(output == 0.)/np.prod(output.shape))
-        else:
-          track_stats['zeros'][current_uname] = [torch.sum(output == 0.)/np.prod(output.shape)]
+    #   if quantRelevantMeasurePass and i == 0:
+    #     if current_uname in track_stats['zeros']:
+    #       track_stats['zeros'][current_uname].append(torch.sum(output == 0.)/np.prod(output.shape))
+    #     else:
+    #       track_stats['zeros'][current_uname] = [torch.sum(output == 0.)/np.prod(output.shape)]
 
-        if current_uname in track_stats['maxv']:
-          track_stats['maxv'][current_uname].append(torch.max(torch.sum(output == n)/np.prod(output.shape), torch.sum(output == -n)/np.prod(output.shape)))
-        else:
-          track_stats['maxv'][current_uname] = [torch.max(torch.sum(output == n)/np.prod(output.shape) , torch.sum(output == -n)/np.prod(output.shape))]
+    #     if current_uname in track_stats['maxv']:
+    #       track_stats['maxv'][current_uname].append(torch.max(torch.sum(output == n)/np.prod(output.shape), torch.sum(output == -n)/np.prod(output.shape)))
+    #     else:
+    #       track_stats['maxv'][current_uname] = [torch.max(torch.sum(output == n)/np.prod(output.shape) , torch.sum(output == -n)/np.prod(output.shape))]
 
-      fin_output += output
+    #   fin_output += output
 
-    # fin_output = F.linear(x, w)
+    fin_output = F.linear(x, w)
     # n = 2**quantAccBits / 2 - 1
     # fin_output = torch.clamp(fin_output, -n, n)
 
@@ -555,7 +550,6 @@ class FLinearQ(torch.autograd.Function):
     #   scale_library[current_uname] = (int(torch.sum(fin_output == 0.))/np.prod(fin_output.shape),
     #                                     max(int(torch.sum(fin_output == n))/np.prod(fin_output.shape),
     #                                         int(torch.sum(fin_output == -n))/np.prod(fin_output.shape)))
-
     return fin_output * sw * sx
 
   @staticmethod
@@ -601,8 +595,8 @@ class FLinearQ(torch.autograd.Function):
     # if quantPrintStats:
     #   print(grad_input.max())
 
-    n = 2**quantAccBits / 2 - 1
-    grad_input = torch.clamp(grad_input, -n, n)
+    # n = 2**quantAccBits / 2 - 1
+    # grad_input = torch.clamp(grad_input, -n, n)
 
     x_h2 = h_bs @ x
     # requantize acts
@@ -638,8 +632,8 @@ class FLinearQ(torch.autograd.Function):
     # if quantPrintStats:
     #   print(grad_w.max())
 
-    n = 2**quantAccBits / 2 - 1
-    grad_w = torch.clamp(grad_w, -n, n)
+    # n = 2**quantAccBits / 2 - 1
+    # grad_w = torch.clamp(grad_w, -n, n)
 
     # if torch.isnan(grad_input).any():
     #   import pdb; pdb.set_trace()
@@ -650,6 +644,7 @@ class FLinearQ(torch.autograd.Function):
     # print(grad_output_h1)
     # print('--------')
     # print(sg1, swh1, sw, sg2, sxh2, sx )
+    # if w.shape == torch.Size([20,64]):
     return grad_input * sg1 * swh1 * sw * 1 / biggest_power2_factor(h_out.shape[0]), grad_w * sg2 * sxh2 * sx * 1 / biggest_power2_factor(h_bs.shape[0]), None, None, None, None
 
 

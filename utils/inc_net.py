@@ -357,11 +357,18 @@ class IncrementalNetWithBias(BaseNet):
   def update_fc(self, nb_classes):
     fc = self.generate_fc(self.feature_dim, nb_classes)
     if self.fc is not None:
-      nb_output = self.fc.out_features
-      weight = copy.deepcopy(self.fc.weight.data)
-      bias = copy.deepcopy(self.fc.bias.data)
-      fc.weight.data[:nb_output] = weight
-      fc.bias.data[:nb_output] = bias
+      try:
+        nb_output = self.fc.out_features
+        weight = copy.deepcopy(self.fc.weight.data)
+        bias = copy.deepcopy(self.fc.bias.data)
+        fc.weight.data[:nb_output] = weight
+        fc.bias.data[:nb_output] = bias
+      except:
+        nb_output = self.fc.module.out_features
+        weight = copy.deepcopy(self.fc.module.weight.data)
+        bias = copy.deepcopy(self.fc.module.bias.data)
+        fc.module.weight.data[:nb_output] = weight
+        fc.module.bias.data[:nb_output] = bias
 
     del self.fc
     self.fc = fc

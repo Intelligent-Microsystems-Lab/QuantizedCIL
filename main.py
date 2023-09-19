@@ -165,6 +165,8 @@ def setup_parser():
 
   parser.add_argument('--example_difficulty', action="store_true")
 
+  parser.add_argument('--fp130', action="store_true")
+
   return parser
 
 

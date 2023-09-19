@@ -116,6 +116,9 @@ def _train(args):
   quant.quantUpdateHighThr = args["quantUpdateHighThr"]
   quant.global_args = args
 
+  if args['fp130']:
+    quant.quantFP134_rep = '11111110'
+
   start_time = time.time()
   logging.info(f"Start time:{start_time}")
 

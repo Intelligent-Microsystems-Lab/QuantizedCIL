@@ -28,15 +28,15 @@ class Conv2d_LUQ(nn.Conv2d):
 
         # correction
         if corrected_version:
-            self.QnW = -(2 ** (self.wbits - 1) -1)
-            self.QpW = 2 ** (self.wbits - 1) - 1
+            self.QnW = -(2 ** (self.wbits - 1)) + 1
+            self.QpW = (2 ** (self.wbits - 1)) - 1
             self.QnA = 0
             self.QpA = 2 ** self.abits - 1
         else:
-            self.QnW = -2 ** (self.wbits - 1)
+            self.QnW = -(2 ** (self.wbits - 1))
             self.QpW = 2 ** (self.wbits - 1)
             self.QnA = 0
-            self.QpA = 2 ** self.abits - 1
+            self.QpA = (2 ** self.abits) - 1
 
         self.register_buffer('init_stateW', torch.zeros(1))
         self.register_buffer('init_stateA', torch.zeros(1))
@@ -58,7 +58,7 @@ class Conv2d_LUQ(nn.Conv2d):
             if torch.min(input) < 0:
                 # correction
                 if corrected_version:
-                    self.QnA = -(2 ** (self.abits - 1) -1)
+                    self.QnA = -(2 ** (self.abits - 1)) + 1
                     self.QpA = (2 ** (self.abits - 1) -1) 
                 else:
                     self.QnA = -2 ** (self.abits - 1)
@@ -138,6 +138,12 @@ class Linear_LUQ(nn.Linear):
         else:
             output = F.linear(input, self.weight, self.bias,)
 
+        # try:
+        #     assert torch.unique(w_q).shape[0] <= 16
+        #     assert torch.unique(qinput).shape[0] <= 16
+        # except:
+        #     import pdb; pdb.set_trace()
+
         output = GradStochasticClippingQ.apply(output, self.quantizeBwd,self.layerIdx,self.repeatBwd)
         return {'logits': output}
 
@@ -210,6 +216,8 @@ class GradStochasticClippingQ(Function):
         else:
 
             grad_input = grad_output
+
+        # assert torch.unique(grad_input).shape[0] <= 16
         return grad_input,None, None,None
 
 

@@ -16,6 +16,8 @@ from utils.data_manager import DataManager
 from datetime import datetime
 import quant
 
+import lptorch as lp
+
 track_layer_list = ['_convnet_conv_1_3x3', '_convnet_stage_1_2_conv_b',
                     '_convnet_stage_2_4_conv_a', '_convnet_stage_3_3_conv_a', '_fc']
 grad_quant_bias = {}
@@ -89,6 +91,18 @@ class LwF(BaseLearner):
             momentum=0.9,
             lr=self.args['init_lr'],
             weight_decay=self.args['init_weight_decay'],
+        )
+        scheduler = optim.lr_scheduler.MultiStepLR(
+            optimizer=optimizer, milestones=self.args['init_milestones'],
+            gamma=self.args['init_lr_decay']
+        )
+      elif self.args["quantMethod"] == "fp134" or self.args["quantMethod"] == "fp130":
+        optimizer = lp.optim.SGD(
+            self._network.parameters(),
+            momentum=0.9,
+            lr=self.args['init_lr'],
+            weight_decay=self.args['init_weight_decay'],
+            weight_quantize=False
         )
         scheduler = optim.lr_scheduler.MultiStepLR(
             optimizer=optimizer, milestones=self.args['init_milestones'],

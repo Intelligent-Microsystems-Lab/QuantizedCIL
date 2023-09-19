@@ -114,7 +114,10 @@ def save_fc(args, model):
   if len(args['device']) > 1: 
     fc_weight = model._network.fc.weight.data    
   else:
-    fc_weight = model._network.fc.weight.data.cpu()
+    try:
+      fc_weight = model._network.fc.weight.data.cpu()
+    except:
+      fc_weight = model._network.fc.module.weight.data.cpu()
   torch.save(fc_weight, _path)
 
   _save_dir = os.path.join(f"./results/fc_weights/{args['prefix']}")
