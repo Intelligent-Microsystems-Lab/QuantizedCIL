@@ -496,8 +496,6 @@ class FLinearQ(torch.autograd.Function):
 
 
     global current_uname
-    fin_output = torch.zeros((x.shape[0], w.shape[0])).to(x.device)
-
     fin_output = 0 * F.linear(x[:,0:quantBlockSize], w[:,0:quantBlockSize])
 
     for i in range(int(np.ceil( x.shape[1]/quantBlockSize ))):
@@ -506,51 +504,13 @@ class FLinearQ(torch.autograd.Function):
       n = 2**quantAccBits / 2 - 1
       output = torch.clamp(output, -n, n)
 
-
-      if quantUpdateScalePhase and i == 0:
-        global scale_library
-        
-        scale_library[current_uname] = (int(torch.sum(output == 0.))/np.prod(output.shape),
-                                        max(int(torch.sum(output == n))/np.prod(output.shape),
-                                            int(torch.sum(output == -n))/np.prod(output.shape)))
-
-      if quantRelevantMeasurePass and i == 0:
-        if current_uname in track_stats['zeros']:
-          track_stats['zeros'][current_uname].append(torch.sum(output == 0.)/np.prod(output.shape))
-        else:
-          track_stats['zeros'][current_uname] = [torch.sum(output == 0.)/np.prod(output.shape)]
-
-        if current_uname in track_stats['maxv']:
-          track_stats['maxv'][current_uname].append(torch.max(torch.sum(output == n)/np.prod(output.shape), torch.sum(output == -n)/np.prod(output.shape)))
-        else:
-          track_stats['maxv'][current_uname] = [torch.max(torch.sum(output == n)/np.prod(output.shape) , torch.sum(output == -n)/np.prod(output.shape))]
-
       fin_output += output
 
     # fin_output = F.linear(x, w)
 
-    n = 2**quantAccBits / 2 - 1
-    fin_output = torch.clamp(fin_output, -n, n)
+    # n = 2**quantAccBits / 2 - 1
+    # fin_output = torch.clamp(fin_output, -n, n)
 
-
-    # global current_uname
-    # if current_uname in track_stats['zeros']:
-    #   track_stats['zeros'][current_uname].append(int(torch.sum(fin_output == 0.))/np.prod(fin_output.shape))
-    # else:
-    #   track_stats['zeros'][current_uname] = [int(torch.sum(fin_output == 0.))/np.prod(fin_output.shape)]
-
-    # if current_uname in track_stats['maxv']:
-    #   track_stats['maxv'][current_uname].append(max(int(torch.sum(fin_output == n))/np.prod(fin_output.shape), int(torch.sum(fin_output == -n))/np.prod(fin_output.shape)))
-    # else:
-    #   track_stats['maxv'][current_uname] = [max(int(torch.sum(fin_output == n))/np.prod(fin_output.shape) , int(torch.sum(fin_output == -n))/np.prod(fin_output.shape))]
-
-    # if quantUpdateScalePhase:
-    #   global scale_library
-    #   # TODO: do not forget to comment back in!!!!
-    #   # global current_uname
-    #   scale_library[current_uname] = (int(torch.sum(fin_output == 0.))/np.prod(fin_output.shape),
-    #                                     max(int(torch.sum(fin_output == n))/np.prod(fin_output.shape),
-    #                                         int(torch.sum(fin_output == -n))/np.prod(fin_output.shape)))
     return fin_output * sw * sx
 
   @staticmethod
