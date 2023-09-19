@@ -367,8 +367,8 @@ class IncrementalNetWithBias(BaseNet):
         nb_output = self.fc.module.out_features
         weight = copy.deepcopy(self.fc.module.weight.data)
         bias = copy.deepcopy(self.fc.module.bias.data)
-        fc.module.weight.data[:nb_output] = weight
-        fc.module.bias.data[:nb_output] = bias
+        fc.weight.data[:nb_output] = weight
+        fc.bias.data[:nb_output] = bias
 
     del self.fc
     self.fc = fc

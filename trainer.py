@@ -16,6 +16,8 @@ from utils.toolkit import ConfigEncoder, count_parameters, save_fc, save_model
 import quant
 from example_difficulty import determine_difficulty, what_did_i_forget
 
+# import torch
+# torch.autograd.set_detect_anomaly(True)
 
 def train(args):
   seed_list = copy.deepcopy(args["seed"])

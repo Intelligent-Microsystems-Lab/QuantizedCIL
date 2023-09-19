@@ -11,6 +11,7 @@ from torch.autograd import Variable
 from torch.autograd.function import InplaceFunction
 
 corrected_version = False
+quantAccBits = 8
 
 class Conv2d_LUQ(nn.Conv2d):
     """docstring for Conv2d_BF16."""
@@ -53,7 +54,7 @@ class Conv2d_LUQ(nn.Conv2d):
         self.repeatBwd = 1
     def forward(self, input):
         if self.quantizeFwd:
-            w_q = UniformQuantizeSawb.apply(self.weight,self.c1,self.c2,self.QpW,self.QnW)
+            w_q, sw = UniformQuantizeSawb.apply(self.weight,self.c1,self.c2,self.QpW,self.QnW)
 
             if torch.min(input) < 0:
                 # correction
@@ -63,11 +64,13 @@ class Conv2d_LUQ(nn.Conv2d):
                 else:
                     self.QnA = -2 ** (self.abits - 1)
 
-            qinput = UniformQuantizeSawb.apply(input,self.c1,self.c2,self.QpA,self.QnA)
+            qinput, sa = UniformQuantizeSawb.apply(input,self.c1,self.c2,self.QpA,self.QnA)
 
             #all
             output = F.conv2d(qinput, w_q, self.bias, self.stride,
                               self.padding, self.dilation, self.groups)
+
+            # output = AccQuant.apply(output) * sw * sa
 
         else:
             output = F.conv2d(input, self.weight, self.bias, self.stride,
@@ -120,7 +123,7 @@ class Linear_LUQ(nn.Linear):
     def forward(self, input):
 
         if self.quantizeFwd:
-            w_q = UniformQuantizeSawb.apply(self.weight,self.c1,self.c2,self.QpW,self.QnW)
+            w_q, sw = UniformQuantizeSawb.apply(self.weight,self.c1,self.c2,self.QpW,self.QnW)
 
             if torch.min(input) < 0:
                 # correction
@@ -130,10 +133,14 @@ class Linear_LUQ(nn.Linear):
                 else:
                     self.QnA = -2 ** (self.abits - 1)
 
-            qinput = UniformQuantizeSawb.apply(input,self.c1,self.c2,self.QpA,self.QnA)
+            qinput, sa = UniformQuantizeSawb.apply(input,self.c1,self.c2,self.QpA,self.QnA)
+
+
 
             #all
             output = F.linear(qinput, w_q, self.bias,)
+
+            # output = AccQuant.apply(output) * sw * sa
 
         else:
             output = F.linear(input, self.weight, self.bias,)
@@ -160,14 +167,33 @@ class UniformQuantizeSawb(InplaceFunction):
             scale = 2*clip / (Qp - Qn)
             output.div_(scale)
             output.clamp_(Qn, Qp).round_()
-            output.mul_(scale)
+            # output.mul_(scale)
+        return output, scale
+
+    @staticmethod
+    def backward(ctx, grad_output, g_s):
+        # straight-through estimator
+        grad_input = grad_output
+        return grad_input, None, None, None, None
+
+
+class AccQuant(InplaceFunction):
+
+    @staticmethod
+    def forward(ctx, input):
+        output = input.clone()
+
+        with torch.no_grad():
+            n = 2**quantAccBits / 2 - 1
+            output = torch.clamp(output, -n, n)
+
         return output
 
     @staticmethod
     def backward(ctx, grad_output):
         # straight-through estimator
         grad_input = grad_output
-        return grad_input, None, None, None, None
+        return grad_input
 
 
 
