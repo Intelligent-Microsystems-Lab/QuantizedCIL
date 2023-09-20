@@ -85,24 +85,24 @@ class LwF(BaseLearner):
       self._old_network.to(self._device)
 
     if self._cur_task == 0:
-      if self.args["optimizer"] == "sgd":
-        optimizer = optim.SGD(
-            self._network.parameters(),
-            momentum=0.9,
-            lr=self.args['init_lr'],
-            weight_decay=self.args['init_weight_decay'],
-        )
-        scheduler = optim.lr_scheduler.MultiStepLR(
-            optimizer=optimizer, milestones=self.args['init_milestones'],
-            gamma=self.args['init_lr_decay']
-        )
-      elif self.args["quantMethod"] == "fp134" or self.args["quantMethod"] == "fp130":
+      if self.args["quantMethod"] == "fp134" or self.args["quantMethod"] == "fp130":
         optimizer = lp.optim.SGD(
             self._network.parameters(),
             momentum=0.9,
             lr=self.args['init_lr'],
             weight_decay=self.args['init_weight_decay'],
             weight_quantize=False
+        )
+        scheduler = optim.lr_scheduler.MultiStepLR(
+            optimizer=optimizer, milestones=self.args['init_milestones'],
+            gamma=self.args['init_lr_decay']
+        )
+      elif self.args["optimizer"] == "sgd":
+        optimizer = optim.SGD(
+            self._network.parameters(),
+            momentum=0.9,
+            lr=self.args['init_lr'],
+            weight_decay=self.args['init_weight_decay'],
         )
         scheduler = optim.lr_scheduler.MultiStepLR(
             optimizer=optimizer, milestones=self.args['init_milestones'],
@@ -133,7 +133,19 @@ class LwF(BaseLearner):
       else:
         self._init_train(train_loader, test_loader, optimizer, scheduler, data_manager)
     else:
-      if self.args["optimizer"] == "sgd":
+      if self.args["quantMethod"] == "fp134" or self.args["quantMethod"] == "fp130":
+        optimizer = lp.optim.SGD(
+            self._network.parameters(),
+            momentum=0.9,
+            lr=self.args['init_lr'],
+            weight_decay=self.args['init_weight_decay'],
+            weight_quantize=False
+        )
+        scheduler = optim.lr_scheduler.MultiStepLR(
+            optimizer=optimizer, milestones=self.args['init_milestones'],
+            gamma=self.args['init_lr_decay']
+        )
+      elif self.args["optimizer"] == "sgd":
         optimizer = optim.SGD(
             self._network.parameters(),
             momentum=0.9,
