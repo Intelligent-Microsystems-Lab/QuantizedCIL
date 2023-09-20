@@ -106,6 +106,7 @@ def _train(args):
   quant.quantCalibrate = args["quantCalibrate"]
   quant.quantTrack = args["quantizeTrack"]
   quant.quantBits = args["quantBits"]
+  quant.quantAccBits = args["quantBits"] * 2
   quant.quantMethod = args["quantMethod"]
   quant.quantFWDWgt = args["quantFWDWgt"]
   quant.quantFWDAct = args["quantFWDAct"]
@@ -180,11 +181,11 @@ def _train(args):
   else:
     save_model(args, model)
 
-  if args['example_difficulty']:
-    determine_difficulty(model, data_manager, args)
-    # what_did_i_forget(model, data_manager, args)
-  else:
-    what_did_i_forget(model, data_manager, args)
+  # if args['example_difficulty']:
+  #   determine_difficulty(model, data_manager, args)
+  #   # what_did_i_forget(model, data_manager, args)
+  # else:
+  #   what_did_i_forget(model, data_manager, args)
 
 
 def _set_device(args):
