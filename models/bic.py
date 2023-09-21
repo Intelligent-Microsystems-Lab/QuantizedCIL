@@ -10,6 +10,8 @@ from torch.utils.data import DataLoader
 from models.base import BaseLearner
 from utils.inc_net import IncrementalNetWithBias
 
+from utils.data_manager import DummyDataset
+
 from datetime import datetime
 import quant
 
