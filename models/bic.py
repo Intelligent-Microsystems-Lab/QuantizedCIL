@@ -11,6 +11,7 @@ from models.base import BaseLearner
 from utils.inc_net import IncrementalNetWithBias
 
 from utils.data_manager import DummyDataset
+from torchvision import transforms
 
 from datetime import datetime
 import quant
