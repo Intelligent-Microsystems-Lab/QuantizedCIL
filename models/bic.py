@@ -92,13 +92,15 @@ class BiC(BaseLearner):
         test_dset, batch_size=self.args['batch_size'], shuffle=False,
         num_workers=self.args['num_workers']
     )
+    # changed position to before training
+    self.build_rehearsal_memory(data_manager, self.samples_per_class)
 
     self._log_bias_params()
     self._stage1_training(self.train_loader, self.test_loader, data_manager)
+    
     if self._cur_task >= 1:
       self._stage2_bias_correction(self.val_loader, self.test_loader, data_manager)
 
-    self.build_rehearsal_memory(data_manager, self.samples_per_class)
 
     if len(self._multiple_gpus) > 1:
       self._network = self._network.module
@@ -118,8 +120,52 @@ class BiC(BaseLearner):
     #         np.save('track_stats/' + self.date_str + '_' + self.args['dataset'] + '_' + self.args['model_name'] + '_' + str(
     #             self._cur_task) + lname + '_' + stat_name + '.npy', torch.hstack(quant.track_stats['grad_stats'][lname][stat_name]).numpy())
 
-  def _run(self, train_loader, test_loader, optimizer, scheduler, stage, data_manager):
-    prog_bar = tqdm(range(self.args['epochs']))
+  def sample_n_p_c_from_memory(self, n, mem_samples, mem_targets):
+    new_samples = {a:[] for a in np.unique(mem_targets)}
+    for input, target in zip(mem_samples, mem_targets):
+      if len(new_samples[target.item()]) < n:
+        new_samples[target.item()].append(input)
+        if sum([len(new_samples[key])==n for key in new_samples]) == len(list(new_samples.keys())):
+          break
+    new_targets = np.array([])
+    for cl in np.unique(mem_targets):
+      new_targets = np.concatenate([new_targets, torch.tensor([cl] * new_samples[cl].__len__() )])
+    return new_samples, new_targets
+
+
+  def replay_train(self, test_loader, optimizer, scheduler, data_manager, mem_samples, mem_targets):
+    
+    old_qbits = quant.quantBits
+    old_accbits = quant.quantAccBits 
+    quant.quantBits = 8
+    quant.quantAccBits = quant.quantBits * 2
+    
+    samples_per_cl = int(self.args["quantReplaySize"] / len(np.unique(mem_targets)))
+    if samples_per_cl == 0:
+      samples_per_cl = 1
+      print("Warning: higher bit replay size too small, using 1 sample per class")
+
+    repl_smpls, repl_tgts = self.sample_n_p_c_from_memory(samples_per_cl, mem_samples, mem_targets)
+
+    print("Higher precion replay:")
+    qreplay_loader = DataLoader(
+        DummyDataset(torch.tensor(mem_samples), torch.tensor(mem_targets),
+                     transforms.Compose([*data_manager._train_trsf,]),
+                     datatype = 'HAR' if len(mem_samples.shape) <= 2 else 'image'),
+        batch_size=len(mem_samples), shuffle=True
+        )
+    repl_stage = "training"
+    self._run(qreplay_loader, test_loader, optimizer, scheduler, repl_stage,
+                     data_manager, nr_epochs=2)
+    quant.quantBits = old_qbits
+
+
+  def _run(self, train_loader, test_loader, optimizer, scheduler, stage,
+           data_manager, nr_epochs=False):
+    if nr_epochs:
+      prog_bar = tqdm(range(nr_epochs))
+    else:
+      prog_bar = tqdm(range(self.args['epochs']))
     gen_cnt = 0
     for _, epoch in enumerate(prog_bar):  # range(1, epochs + 1):
       self._network.train()
@@ -284,6 +330,10 @@ class BiC(BaseLearner):
     else:
       self._run(train_loader, test_loader, optimizer,
                 scheduler, stage="training", data_manager = data_manager)
+    
+    if self.args["quantReplaySize"]>0:
+      mem_samples, mem_targets = self._get_memory()
+      self.replay_train(data_manager, mem_samples, mem_targets)
 
   def _stage2_bias_correction(self, val_loader, test_loader, data_manager):
     if isinstance(self._network, nn.DataParallel):

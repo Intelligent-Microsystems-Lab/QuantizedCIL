@@ -137,6 +137,7 @@ def setup_parser():
   parser.add_argument('--quantUpdateP', '-qUP', type=int, default=100)
   parser.add_argument('--quantUpdateLowThr', '-qULT', type=float, default=.7)
   parser.add_argument('--quantUpdateHighThr', '-qUHT', type=float, default=.3)
+  parser.add_argument('--quantReplaySize', '-qRS', type=int, default=0,)
 
   # training parameters
   parser.add_argument('--init_epoch', type=int, default=170)
