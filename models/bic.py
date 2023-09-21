@@ -92,8 +92,6 @@ class BiC(BaseLearner):
         test_dset, batch_size=self.args['batch_size'], shuffle=False,
         num_workers=self.args['num_workers']
     )
-    # changed position to before training
-    self.build_rehearsal_memory(data_manager, self.samples_per_class)
 
     self._log_bias_params()
     self._stage1_training(self.train_loader, self.test_loader, data_manager)
@@ -101,6 +99,7 @@ class BiC(BaseLearner):
     if self._cur_task >= 1:
       self._stage2_bias_correction(self.val_loader, self.test_loader, data_manager)
 
+    self.build_rehearsal_memory(data_manager, self.samples_per_class)
 
     if len(self._multiple_gpus) > 1:
       self._network = self._network.module
@@ -333,7 +332,8 @@ class BiC(BaseLearner):
     
     if self.args["quantReplaySize"]>0:
       mem_samples, mem_targets = self._get_memory()
-      self.replay_train(data_manager, mem_samples, mem_targets)
+      if len(mem_samples) > 0:
+        self.replay_train(data_manager, mem_samples, mem_targets)
 
   def _stage2_bias_correction(self, val_loader, test_loader, data_manager):
     if isinstance(self._network, nn.DataParallel):

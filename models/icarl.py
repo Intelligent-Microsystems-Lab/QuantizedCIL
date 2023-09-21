@@ -180,7 +180,8 @@ class iCaRL(BaseLearner):
       
     if self.args["quantReplaySize"]>0:
       mem_samples, mem_targets = self._get_memory()
-      self.replay_train(data_manager, mem_samples, mem_targets)
+      if len(mem_samples) > 0:
+        self.replay_train(data_manager, mem_samples, mem_targets)
 
 
   
