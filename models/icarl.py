@@ -178,7 +178,7 @@ class iCaRL(BaseLearner):
       self._update_representation(
           train_loader, test_loader, optimizer, scheduler, data_manager)
       
-    if self.args["quantReplaySize"]>0:
+    if self.args["quantReplaySize"] > 0 and self._cur_task > 0:
       mem_samples, mem_targets = self._get_memory()
       if len(mem_samples) > 0:
         self.replay_train(data_manager, mem_samples, mem_targets)
