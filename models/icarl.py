@@ -18,6 +18,8 @@ from utils.data_manager import DummyDataset
 from datetime import datetime
 import quant
 
+import lptorch as lp
+
 track_layer_list = ['_convnet_conv_1_3x3', '_convnet_stage_1_2_conv_b',
                     '_convnet_stage_2_4_conv_a', '_convnet_stage_3_3_conv_a', '_fc']
 grad_quant_bias = {}

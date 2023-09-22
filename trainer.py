@@ -106,7 +106,7 @@ def _train(args):
   quant.quantCalibrate = args["quantCalibrate"]
   quant.quantTrack = args["quantizeTrack"]
   quant.quantBits = args["quantBits"]
-  quant.quantAccBits = args["quantBits"] * 2
+  quant.quantAccBits = args["quantBits"]  * 2
   quant.quantMethod = args["quantMethod"]
   quant.quantFWDWgt = args["quantFWDWgt"]
   quant.quantFWDAct = args["quantFWDAct"]
