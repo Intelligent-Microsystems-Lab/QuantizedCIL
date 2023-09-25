@@ -14,7 +14,7 @@ from utils.data_manager import DataManager
 from utils.toolkit import ConfigEncoder, count_parameters, save_fc, save_model
 
 import quant
-from example_difficulty import determine_difficulty, what_did_i_forget
+from example_difficulty import determine_difficulty, what_did_i_forget, class_acc, class_acc_diff
 
 # import torch
 # torch.autograd.set_detect_anomaly(True)
@@ -106,7 +106,7 @@ def _train(args):
   quant.quantCalibrate = args["quantCalibrate"]
   quant.quantTrack = args["quantizeTrack"]
   quant.quantBits = args["quantBits"]
-  quant.quantAccBits = args["quantBits"]  * 2
+  quant.quantAccBits = args["quantBits"] * 2
   quant.quantMethod = args["quantMethod"]
   quant.quantFWDWgt = args["quantFWDWgt"]
   quant.quantFWDAct = args["quantFWDAct"]
@@ -186,6 +186,7 @@ def _train(args):
   #   # what_did_i_forget(model, data_manager, args)
   # else:
   #   what_did_i_forget(model, data_manager, args)
+  # class_acc_diff(model, data_manager, args)
 
 
 def _set_device(args):
