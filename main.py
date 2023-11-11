@@ -38,51 +38,7 @@ def eval_args(args):
   elif args.dataset == "mnist":
     args.in_dim = 784
   else:
-    # TODO add other datasets
     pass
-
-  # prevent arguments conflict
-  # if args.quantMethod == "luq":
-  #   if not args.quantizeFwd:
-  #     update_message("luq", "quantizeFwd", True)
-  #     args.quantizeFwd = True
-  #   if not args.quantizeBwd:
-  #     update_message("luq", "quantizeBwd", True)
-  #     args.quantizeBwd = True
-  #   if args.quantGradRound != "stoch":
-  #     update_message("luq", "quantGradRound", "stoch")
-  #     args.quantGradRound = "stoch" 
-  #   if args.quantCalibrate:
-  #     update_message("luq", "quantCalibrate", "max")
-  #     args.quantCalibrate = "max"
-  #   if args.quantizeTrack:
-  #     update_message("luq", "quantizeTrack", False)
-  #     args.quantizeTrack = False
-  # elif args.quantMethod == "ours":
-  #   # TODO: add our quantization method
-  #   if not args.quantizeFwd:
-  #     update_message("ours", "quantizeFwd", True)
-  #     args.quantizeFwd = True
-  #   if not args.quantizeBwd:
-  #     update_message("ours", "quantizeBwd", True)
-  #     args.quantizeBwd = True
-  #   if args.quantCalibrate:
-  #     update_message("ours", "quantCalibrate", "max")
-  #     args.quantCalibrate = "max"
-  #   # if args.quantGradRound != "standard":
-  #   #   update_message("ours", "quantGradRound", "standard")
-  #   #   args.quantGradRound = "standard" 
-  #   if args.quantizeTrack:
-  #     update_message("ours", "quantizeTrack", False)
-  #     args.quantizeTrack = False
-  # if args.quantizeTrack:
-  #   # switching both off removes all quantization
-  #   if args.quantizeFwd:
-  #     update_message("quantizeTrack", "quantizeFwd", False)
-  #     args.quantizeFwd = False
-  #   if args.quantizeBwd:
-  #     update_message("quantizeTrack", "quantizeBwd", False)
-  #     args.quantizeBwd = False
   return args
 
 
@@ -138,6 +94,9 @@ def setup_parser():
   parser.add_argument('--quantUpdateLowThr', '-qULT', type=float, default=.7)
   parser.add_argument('--quantUpdateHighThr', '-qUHT', type=float, default=.3)
   parser.add_argument('--quantReplaySize', '-qRS', type=int, default=0,)
+  parser.add_argument('--quantHadOff', action="store_true")
+  parser.add_argument('--quantAccBits', type=int, default=16)
+  parser.add_argument('--quantRequantize', type=bool, default=True)
 
   # training parameters
   parser.add_argument('--init_epoch', type=int, default=170)

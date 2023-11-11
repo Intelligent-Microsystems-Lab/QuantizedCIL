@@ -1,7 +1,3 @@
-# IMSL Lab - University of Notre Dame | University of St Andrews
-# Author: Clemens JS Schaefer | Martin Schiemer
-# Quantized training.
-
 import scipy
 import numpy as np
 import functools
@@ -52,6 +48,8 @@ quantBWDAct = 'int'
 quantBWDGrad1 = "int"
 quantBWDGrad2 = "int"
 quantBlockSize = 32
+quantHadOff = False
+quantRequantize = True
 quantRelevantMeasurePass = False
 quantUpdateScalePhase = False
 quantUpdateLowThr = .7
@@ -97,23 +95,6 @@ class QuantMomentumOptimizer(torch.optim.Optimizer):
           self.layer_lr[p] = self.param_groups[0]['lr']
         if p.grad is not None:
 
-          # backup = copy.deepcopy(p.data)
-
-          # if (self.layer_lr[p] * p.grad.data).max() < 1.0:
-          #   self.layer_lr[p] *= 1.1
-          #   # p.data -=  (torch.bernoulli(torch.ones_like(p.data) * .5) * 2 - 1 ) * torch.bernoulli(torch.ones_like(p.data) * .5)
-          # else:
-
-          # def w4_fn(w):
-          #   mx = 2**(quantWgtStoreBits - 1) 
-          #   scale = mx / (2**(quantBits - 1))
-          #   w = torch.clamp(w, -mx+1, mx-1)
-          #   w = torch.round(w / (scale + 1e-32))
-          #   return w
-
-          # w4_before = w4_fn(p.data)  
-
-
           p.data -= self.layer_lr[p] * p.grad.data
 
           def dynamic_intQ2(x, scale=None):
@@ -129,38 +110,12 @@ class QuantMomentumOptimizer(torch.optim.Optimizer):
 
           p.data = dynamic_intQ2(p.data)
 
-          # p.data = torch.clip(
-          #     p.data, -(2**(quantWgtStoreBits - 1) - 1), (2**(quantWgtStoreBits - 1) - 1))
-          # p.data = torch.round(p.data)
-
-
-          # w4_after = w4_fn(p.data)
-
-          # scale = (2**(quantWgtStoreBits-1)) / (2**(quantBits-1))
-
-          # # import pdb; pdb.set_trace()
-          # p.data = torch.where(w4_after > w4_before, w4_fn(p.data)*scale, p.data)
-          # p.data = torch.where(w4_after < w4_before, w4_fn(p.data)*scale, p.data)
-
-          
-
-          # if quantUpdateScalePhase:
-          #   scale_library[current_uname] = (int(torch.sum(output == 0.))/np.prod(output.shape),
-          #                               max(int(torch.sum(output == n))/np.prod(output.shape),
-          #                                   int(torch.sum(output == -n))/np.prod(output.shape)))
-          # np.mean((backup == p.data).cpu().numpy())
-          # backup == p.data
-          # print(torch.abs(backup - p.data).max())
-          # import pdb; pdb.set_trace()
-
 
 def init_properties(obj, uname):
   obj.fullName = ''
   obj.statistics = []
   obj.layerIdx = 0
 
-  # obj.alpha = Parameter(torch.tensor([1], dtype=torch.float32))
-  # obj.beta = Parameter(torch.tensor([1], dtype=torch.float32))
   obj.abits = quantBits
   obj.wbits = quantBits
 
@@ -328,8 +283,6 @@ def balanced_scale_calibration_fwd(memory_tuple, train_set_copy, known_cl,
 
       del train_set_copy, train_loader_copy
 
-    # TODO: make batchsize equal to args batch_size and sample stratified
-    # TODO: datatype HAR wrong @ms400?
     update_loader = DataLoader(
         DummyDataset(torch.tensor(mem_samples), torch.tensor(mem_targets), transforms.Compose([*data_manager._train_trsf,]), datatype = 'HAR' if len(mem_samples.shape) <= 2 else 'image'),
         batch_size=len(mem_samples), shuffle=True
@@ -356,42 +309,29 @@ def update_scale(m, c_path='',):
           if scale_library[c_path + '_' + attr_str][1] > quantUpdateHighThr:
             with torch.no_grad():
               target_attr.weight /= 2
-              # TODO: maybe try ceil
               target_attr.weight.data = torch.floor(target_attr.weight.data)
-              # TODO: check if times two is correct
               target_attr.sw *= 2
               # print('increased scale '+c_path + '_' + attr_str)
             # elif quant_no_update_perc[c_name.replace('_', '.')[1:] + '.weight'] > quantUpdateLowThr:
           elif scale_library[c_path + '_' + attr_str][1] < quantUpdateLowThr:
             with torch.no_grad():
               target_attr.weight *= 2
-              # TODO: maybe try ceil
               target_attr.weight.data = torch.floor(target_attr.weight.data)
-              # TODO: check if times two is correct
               target_attr.sw /= 2
-              # print('decreased scale '+c_path + '_' + attr_str)
           
       if isinstance(target_attr, Linear_Ours): # or isinstance(target_attr,
         if hasattr(target_attr, 'c1'):
-          # print(attr_str)
           c_name = c_path + '_' + attr_str
           if scale_library[c_path + '_' + attr_str][1] > quantUpdateHighThr:
             with torch.no_grad():
               target_attr.weight /= 2
-              # TODO: maybe try ceil
               target_attr.weight.data = torch.floor(target_attr.weight.data)
-              # TODO: check if times two is correct
               target_attr.sw *= 2
-              # print('increased scale '+c_path + '_' + attr_str)
-            # elif quant_no_update_perc[c_name.replace('_', '.')[1:] + '.weight'] > quantUpdateLowThr:
           elif  scale_library[c_path + '_' + attr_str][1] < quantUpdateLowThr:
             with torch.no_grad():
               target_attr.weight *= 2
-              # TODO: maybe try ceil
               target_attr.weight.data = torch.floor(target_attr.weight.data)
-              # TODO: check if times two is correct
               target_attr.sw /= 2
-              # print('decreased scale '+c_path + '_' + attr_str)
 
           
   for n, ch in m.named_children():
@@ -419,7 +359,6 @@ def dynamic_stoch(x, scale=1):
   dim = x.shape
   x = x.flatten()
 
-  # print(x.abs().max())
   mx = torch.min(x.abs().max(), torch.ones_like(x[0]) * 1e+8) * scale  # torch.quantile(x.abs(), .99) # TODO optimize calibration
   scale = mx / (2**(quantBits - 1) - 1)
   x = torch.clamp(x, -mx, mx) / (scale + 1e-32)
@@ -439,7 +378,6 @@ def dynamic_stoch(x, scale=1):
 
 def dynamic_intQ(x, scale=None):
   # can only be used in BWD - not differentiable
-  # torch.quantile(x.abs(), .99) # TODO optimize calibration
   if scale is None:
     scale = global_args["quantile"]
   mx = x.abs().max() * scale
@@ -452,7 +390,6 @@ class dynamic_intQ_FWD(Function):
 
   @staticmethod
   def forward(ctx, x):
-    # torch.quantile(x.abs(), .99) # TODO optimize calibration
     mx = x.abs().max() * global_args["quantile"]
     ctx.mx = mx
     ctx.save_for_backward(x)
@@ -469,9 +406,6 @@ class dynamic_intQ_FWD(Function):
   def backward(ctx, grad_output, grad_scale):
     # STE
     x, = ctx.saved_tensors
-
-    # TODO local scale reconsideration
-    # local_mx = ctx.mx
     local_mx = (2**(quantBits - 1) - 1)
 
     grad_output = torch.where(x > local_mx, torch.tensor(
@@ -506,11 +440,6 @@ class FLinearQ(torch.autograd.Function):
 
       fin_output += output
 
-    # fin_output = F.linear(x, w)
-
-    # n = 2**quantAccBits / 2 - 1
-    # fin_output = torch.clamp(fin_output, -n, n)
-
     return fin_output * sw * sx
 
   @staticmethod
@@ -521,20 +450,28 @@ class FLinearQ(torch.autograd.Function):
   @staticmethod
   def backward(ctx, grad_output):
 
-    # TODO scales
     x, w, h_out, h_bs, sx, sw = ctx.saved_tensors
 
-    w_h1 = h_out @ w
-    # requantize weights
-    if quantBWDWgt == 'int':
-      w_h1, swh1 = dynamic_intQ(w_h1, scale=1.)
-    elif quantBWDWgt == 'noq':
-      w_h1 = w_h1
-      swh1 = torch.tensor([1.0])
+    if quantHadOff:
+      w_h1 = w
     else:
-      raise Exception('Grad rounding scheme not implemented: ' + quantBWDWgt)
+      w_h1 = h_out @ w
+    # requantize weights
+    if quantRequantize:
+      if quantBWDWgt == 'int':
+        w_h1, swh1 = dynamic_intQ(w_h1, scale=1.)
+      elif quantBWDWgt == 'noq':
+        w_h1 = w_h1
+        swh1 = torch.tensor([1.0])
+      else:
+        raise Exception('Grad rounding scheme not implemented: ' + quantBWDWgt)
+    else:
+      swh1 = torch.tensor([1.0])
 
-    grad_output_h1 = grad_output @ h_out
+    if quantHadOff:
+      grad_output_h1 = grad_output
+    else:
+      grad_output_h1 = grad_output @ h_out
     # quant grad_output
     if quantBWDGrad1 == 'int':
       grad_output_h1, sg1 = dynamic_intQ(grad_output_h1)
@@ -549,29 +486,33 @@ class FLinearQ(torch.autograd.Function):
     else:
       raise Exception('Grad rounding scheme not implemented: ' + quantBWDGrad1)
 
-    # print(torch.unique(grad_output_h1).shape[0])
-    # TODO biggest power of two can be optimized
     grad_input = (grad_output_h1 @ w_h1) 
-
-    # if quantPrintStats:
-    #   print(grad_input.max())
 
     n = 2**quantAccBits / 2 - 1
     grad_input = torch.clamp(grad_input, -n, n)
 
-    x_h2 = h_bs @ x
-    # requantize acts
-    if quantBWDAct == 'int':
-      x_h2, sxh2 = dynamic_intQ(x_h2, scale=1.)
-    elif quantBWDAct == 'noq':
-      x_h2 = x_h2
-      sxh2 = torch.tensor([1.0])
-    elif quantBWDAct == 'stoch':
-      x_h2, sxh2 = dynamic_stoch(x_h2)
+    if quantHadOff:
+      x_h2 = x
     else:
-      raise Exception('Grad rounding scheme not implemented: ' + quantBWDAct)
+      x_h2 = h_bs @ x
+    # requantize acts
+    if quantRequantize:
+      if quantBWDAct == 'int':
+        x_h2, sxh2 = dynamic_intQ(x_h2, scale=1.)
+      elif quantBWDAct == 'noq':
+        x_h2 = x_h2
+        sxh2 = torch.tensor([1.0])
+      elif quantBWDAct == 'stoch':
+        x_h2, sxh2 = dynamic_stoch(x_h2)
+      else:
+        raise Exception('Grad rounding scheme not implemented: ' + quantBWDAct)
+    else:
+      sxh2 = torch.tensor([1.0])
 
-    grad_output_h2 = grad_output.T @ h_bs
+    if quantHadOff:
+      grad_output_h2 = grad_output
+    else:
+      grad_output_h2 = grad_output.T @ h_bs
     # quant grad_output
     if quantBWDGrad2 == 'int':
       grad_output_h2, sg2 = dynamic_intQ(grad_output_h2)
@@ -586,26 +527,11 @@ class FLinearQ(torch.autograd.Function):
     else:
       raise Exception('Grad rounding scheme not implemented: ' + quantBWDGrad2)
 
-    # print(torch.unique(grad_output_h2).shape[0])
-
     grad_w = (grad_output_h2 @ x_h2) 
-
-    # if quantPrintStats:
-    #   print(grad_w.max())
 
     n = 2**quantAccBits / 2 - 1
     grad_w = torch.clamp(grad_w, -n, n)
 
-    # if torch.isnan(grad_input).any():
-    #   import pdb; pdb.set_trace()
-    # if torch.isnan(grad_w).any():
-    #   import pdb; pdb.set_trace()
-
-    # print(grad_output_h2)
-    # print(grad_output_h1)
-    # print('--------')
-    # print(sg1, swh1, sw, sg2, sxh2, sx )
-    # if w.shape == torch.Size([20,64]):
     return grad_input * sg1 * swh1 * sw * 1 / biggest_power2_factor(h_out.shape[0]), grad_w * sg2 * sxh2 * sx * 1 / biggest_power2_factor(h_bs.shape[0]), None, None, None, None
 
 
@@ -777,11 +703,6 @@ class Conv2d_Ours(nn.Conv2d):
         0).repeat(qinput.shape[0], 1, 1), self.hadamard_bs.unsqueeze(0).repeat(qinput.shape[0], 1, 1),
         sa.unsqueeze(0).repeat(qinput.shape[0], 1, 1), sw.unsqueeze(0).repeat(qinput.shape[0], 1, 1))
 
-    # out = []
-    # for i in range(qinput.shape[0]):
-    #   out.append(FLinearQ.apply(qinput[i,:], w_q.T, self.hadamard_out, self.hadamard_bs, sa, sw))
-    # out = torch.stack(out)
-
     # reshaping outputs into image form with batch, channel, height, width
     out = out.transpose(1, 2)
     output = out.view((input.shape[0], self.out_channels, int(
@@ -789,10 +710,5 @@ class Conv2d_Ours(nn.Conv2d):
 
     if self.bias is not None:
       output += self.bias.view(1, -1, 1, 1)
-
-    # np.testing.assert_allclose(output_cmp.cpu().detach().numpy(), output.cpu().detach().numpy(), rtol=1e-05, atol=1e-2)
-
-    # else:
-    #   output = F.linear(input, self.weight, self.bias)
 
     return output

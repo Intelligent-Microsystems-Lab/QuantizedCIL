@@ -16,8 +16,6 @@ from utils.toolkit import ConfigEncoder, count_parameters, save_fc, save_model
 import quant
 from example_difficulty import determine_difficulty, what_did_i_forget, class_acc, class_acc_diff
 
-# import torch
-# torch.autograd.set_detect_anomaly(True)
 
 def train(args):
   seed_list = copy.deepcopy(args["seed"])
@@ -106,7 +104,7 @@ def _train(args):
   quant.quantCalibrate = args["quantCalibrate"]
   quant.quantTrack = args["quantizeTrack"]
   quant.quantBits = args["quantBits"]
-  quant.quantAccBits = args["quantBits"] * 2
+  quant.quantAccBits = args["quantAccBits"]
   quant.quantMethod = args["quantMethod"]
   quant.quantFWDWgt = args["quantFWDWgt"]
   quant.quantFWDAct = args["quantFWDAct"]
@@ -117,6 +115,8 @@ def _train(args):
   quant.quantBlockSize = args["quantBlockSize"]
   quant.quantUpdateLowThr = args["quantUpdateLowThr"]
   quant.quantUpdateHighThr = args["quantUpdateHighThr"]
+  quant.quantHadOff = args["quantHadOff"]
+  quant.quantRequantize = args["quantRequantize"]
   quant.global_args = args
 
   if args['fp130']:
@@ -181,13 +181,6 @@ def _train(args):
   else:
     save_model(args, model)
 
-  # if args['example_difficulty']:
-  #   determine_difficulty(model, data_manager, args)
-  #   # what_did_i_forget(model, data_manager, args)
-  # else:
-  #   what_did_i_forget(model, data_manager, args)
-  # class_acc_diff(model, data_manager, args)
-
 
 def _set_device(args):
   device_type = args["device"]
@@ -200,18 +193,10 @@ def _set_device(args):
       device = torch.device("cuda") # torch.device("cuda:{}".format(device))
 
     gpus.append(device)
-
-  # gpus.append(torch.device("cuda"))
-  # import pdb; pdb.set_trace()
   args["device"] = gpus
-  # print(torch.cuda.device_count())
-  # print(gpus)
-  # import os
-  # print(os.environ["CUDA_VISIBLE_DEVICES"])
-
+  
 
 def _set_random(seed):
-  # TODO want same model for each experiment start?
   random.seed(seed)
   np.random.seed(seed)
   torch.manual_seed(seed)
