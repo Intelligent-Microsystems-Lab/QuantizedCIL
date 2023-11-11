@@ -97,6 +97,7 @@ def setup_parser():
   parser.add_argument('--quantHadOff', action="store_true")
   parser.add_argument('--quantAccBits', type=int, default=16)
   parser.add_argument('--quantRequantize', type=bool, default=True)
+  parser.add_argument('--LUQCorr', action="store_true")
 
   # training parameters
   parser.add_argument('--init_epoch', type=int, default=170)

@@ -120,6 +120,7 @@ def _train(args):
   quant.quantHadOff = args["quantHadOff"]
   quant.quantRequantize = args["quantRequantize"]
   quant.global_args = args
+  LUQ.corrected_version = args["LUQCorr"]
 
   if args['fp130']:
     quant.quantFP134_rep = '11111110'
