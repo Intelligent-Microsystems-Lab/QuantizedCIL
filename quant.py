@@ -173,8 +173,8 @@ def Linear_FP134(in_features, out_features, bias, uname):
   return qnn.QLayer(nn.Linear(in_features = in_features, out_features = out_features, bias = bias), last=True, ret_dict = True)
 
 def place_quant(m, lin_w, lin_b, c_path='',):
-  if isinstance(m, qnn.QLayer):
-    return
+  # if isinstance(m, qnn.QLayer):
+  #   return
 
   for attr_str in dir(m):
     if attr_str[:1] != '_':
@@ -510,7 +510,7 @@ class FLinearQ(torch.autograd.Function):
       sxh2 = torch.tensor([1.0])
 
     if quantHadOff:
-      grad_output_h2 = grad_output
+      grad_output_h2 = grad_output.T
     else:
       grad_output_h2 = grad_output.T @ h_bs
     # quant grad_output
