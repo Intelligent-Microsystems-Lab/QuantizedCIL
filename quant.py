@@ -173,8 +173,8 @@ def Linear_FP134(in_features, out_features, bias, uname):
   return qnn.QLayer(nn.Linear(in_features = in_features, out_features = out_features, bias = bias), last=True, ret_dict = True)
 
 def place_quant(m, lin_w, lin_b, c_path='',):
-  # if isinstance(m, qnn.QLayer):
-  #   return
+  if isinstance(m, qnn.QLayer):
+    return
 
   for attr_str in dir(m):
     if attr_str[:1] != '_':
