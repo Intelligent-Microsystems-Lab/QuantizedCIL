@@ -14,6 +14,7 @@ from utils.data_manager import DataManager
 from utils.toolkit import ConfigEncoder, count_parameters, save_fc, save_model
 
 import quant
+from luq import LUQ
 from example_difficulty import determine_difficulty, what_did_i_forget, class_acc, class_acc_diff
 
 
@@ -105,6 +106,7 @@ def _train(args):
   quant.quantTrack = args["quantizeTrack"]
   quant.quantBits = args["quantBits"]
   quant.quantAccBits = args["quantAccBits"]
+  LUQ.quantAccBits = args["quantAccBits"]
   quant.quantMethod = args["quantMethod"]
   quant.quantFWDWgt = args["quantFWDWgt"]
   quant.quantFWDAct = args["quantFWDAct"]
