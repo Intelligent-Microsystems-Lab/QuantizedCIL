@@ -70,7 +70,8 @@ class Conv2d_LUQ(nn.Conv2d):
             output = F.conv2d(qinput, w_q, self.bias, self.stride,
                               self.padding, self.dilation, self.groups)
 
-            output = AccQuant.apply(output) * sw * sa
+            if quantAccBits < 16:
+                output = AccQuant.apply(output) * sw * sa
 
         else:
             output = F.conv2d(input, self.weight, self.bias, self.stride,

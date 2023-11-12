@@ -145,7 +145,7 @@ def init_properties(obj, uname):
   obj.uname = uname
 
 def set_lptorch_quant():
-  df_format = [int(x) for x in list(quantFP134_rep)]#$ list('555555543210')]
+  df_format = [int(x) for x in list('555555543210')] #  [int(x) for x in list(quantFP134_rep)]#$
   n_format = [int(x) for x in list(quantFP134_rep)]
   lp.set_activ_quant(lp.quant.quant(lp.quant.custom_fp_format(df_format), room=1, stochastic=False))
   lp.set_error_quant(lp.quant.quant(lp.quant.custom_fp_format(df_format), room=1, stochastic=True))
