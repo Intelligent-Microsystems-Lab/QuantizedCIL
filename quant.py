@@ -20,8 +20,8 @@ from torch.utils.data import DataLoader
 
 from luq import LUQ
 from luq.LUQ import Conv2d_LUQ, Linear_LUQ
-import lptorch as lp
-qnn = lp.nn
+# import lptorch as lp
+# qnn = lp.nn
 
 from squant_function import SQuant_func
 
@@ -173,8 +173,8 @@ def Linear_FP134(in_features, out_features, bias, uname):
   return qnn.QLayer(nn.Linear(in_features = in_features, out_features = out_features, bias = bias), last=True, ret_dict = True)
 
 def place_quant(m, lin_w, lin_b, c_path='',):
-  if isinstance(m, qnn.QLayer):
-    return
+  # if isinstance(m, qnn.QLayer):
+  #   return
 
   for attr_str in dir(m):
     if attr_str[:1] != '_':
@@ -437,6 +437,13 @@ class FLinearQ(torch.autograd.Function):
       # requantize to acc BW (clamp to big values - no scale)
       n = 2**quantAccBits / 2 - 1
       output = torch.clamp(output, -n, n)
+
+      if quantUpdateScalePhase:
+        global scale_library
+        global current_uname
+        scale_library[current_uname] = (int(torch.sum(output == 0.))/np.prod(output.shape),
+                                        max(int(torch.sum(output == n))/np.prod(output.shape),
+                                            int(torch.sum(output == -n))/np.prod(output.shape)))
 
       fin_output += output
 
