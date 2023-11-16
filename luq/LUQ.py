@@ -78,6 +78,7 @@ class Conv2d_LUQ(nn.Conv2d):
                               self.padding, self.dilation, self.groups)
 
         output = GradStochasticClippingQ.apply(output, self.quantizeBwd,self.layerIdx,self.repeatBwd)
+
         return output
 
 
@@ -138,7 +139,7 @@ class Linear_LUQ(nn.Linear):
 
 
 
-            #all
+            # all
             output = F.linear(qinput, w_q, self.bias,)
 
             # output = AccQuant.apply(output) * sw * sa
@@ -153,6 +154,10 @@ class Linear_LUQ(nn.Linear):
         #     import pdb; pdb.set_trace()
 
         output = GradStochasticClippingQ.apply(output, self.quantizeBwd,self.layerIdx,self.repeatBwd)
+
+        # if torch.isnan(output).any():
+        #     import pdb; pdb.set_trace()
+
         return {'logits': output}
 
 
@@ -166,7 +171,7 @@ class UniformQuantizeSawb(InplaceFunction):
         with torch.no_grad():
             clip = (c1*torch.sqrt(torch.mean(input**2))) - (c2*torch.mean(input.abs()))
             scale = 2*clip / (Qp - Qn)
-            output.div_(scale)
+            output.div_(scale + 1e-5)
             output.clamp_(Qn, Qp).round_()
             # output.mul_(scale)
         return output, scale

@@ -17,6 +17,7 @@ import quant
 from luq import LUQ
 from example_difficulty import determine_difficulty, what_did_i_forget, class_acc, class_acc_diff
 
+# torch.autograd.set_detect_anomaly(True)
 
 def train(args):
   seed_list = copy.deepcopy(args["seed"])
