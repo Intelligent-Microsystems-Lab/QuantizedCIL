@@ -55,7 +55,7 @@ quantUpdateScalePhase = False
 quantUpdateLowThr = .7
 quantUpdateHighThr = .3
 global_args = None
-quant_no_update_perc = None
+quant_bin_use_perc = []
 
 current_uname = ''
 
@@ -69,6 +69,7 @@ quantGradMxScale = 1.
 quantFP134_rep = '555555543210'# '11111110'
 
 scale_library = {}
+quant_range_use_perc = {}
 
 
 class QuantMomentumOptimizer(torch.optim.Optimizer):
@@ -249,7 +250,8 @@ def place_quant(m, lin_w, lin_b, c_path='',):
 
 
 def balanced_scale_calibration_fwd(memory_tuple, train_set_copy, known_cl,
-                                   total_cl, model, device, data_manager, replay = True):
+                                   total_cl, model, device, data_manager,
+                                   replay = True, recursion=False):
   if quantFWDWgt != 'mem':
     return
   
@@ -258,7 +260,7 @@ def balanced_scale_calibration_fwd(memory_tuple, train_set_copy, known_cl,
   with torch.no_grad():
     mem_samples, mem_targets = memory_tuple
     samples_per_cl = mem_samples.shape[0] / len(np.unique(mem_targets))
-    if replay:
+    if replay and not recursion:
       # get as many samples from the new classes as for each in memory
       train_loader_copy = DataLoader(
           train_set_copy, batch_size=1, shuffle=True
@@ -288,6 +290,8 @@ def balanced_scale_calibration_fwd(memory_tuple, train_set_copy, known_cl,
         batch_size=len(mem_samples), shuffle=True
         )
 
+    global quant_bin_use_perc
+    quant_bin_use_perc = []
     for _, inputs, targets in update_loader:
       inputs, targets = inputs.to(device), targets.to(device)
       model(inputs)
@@ -295,7 +299,60 @@ def balanced_scale_calibration_fwd(memory_tuple, train_set_copy, known_cl,
     del update_loader
   
   update_scale(model)
+  # either scale or tiles and no recursion
+  if not recursion:
+    # update_bits((mem_samples, mem_targets), model, device,
+    #             data_manager, replay)
+    update_tiles((mem_samples, mem_targets), model, device,
+                data_manager, replay)
+  
   quantUpdateScalePhase = False
+
+
+def update_bits(memory_tuple, model, device, data_manager, replay):
+  updated = False
+  global quant_bin_use_perc
+  global quantBits
+  # if torch.mean(torch.tensor(quant_bin_use_perc)) > quantUpdateHighThr:
+  print("usage perc: ", torch.mean(torch.tensor(quant_bin_use_perc)))
+  if torch.mean(torch.tensor(quant_bin_use_perc)) >= 1.0:
+  
+    quantBits = max(1, quantBits + 1)
+    updated = True
+    print('increased quantBits to ' + str(quantBits))
+  elif torch.mean(torch.tensor(quant_bin_use_perc)) < quantUpdateLowThr:
+  # elif torch.mean(torch.tensor(quant_bin_use_perc)) < 0.5:
+    quantBits = min(32, quantBits - 1)
+    updated = True
+    print('decreased quantBits to ' + str(quantBits))
+  
+  if updated:
+    balanced_scale_calibration_fwd(memory_tuple, None, None, None, model,
+                                   device, data_manager, replay,
+                                   recursion=True)
+
+
+def update_tiles(memory_tuple, model, device, data_manager, replay):
+  updated = False
+  global quantBlockSize
+  # if torch.mean(torch.tensor(quant_bin_use_perc)) > quantUpdateHighThr:
+  import pdb; pdb.set_trace()
+  print("usage perc: ", torch.mean(torch.tensor(quant_bin_use_perc)))
+  if torch.mean(torch.tensor(quant_bin_use_perc)) >= 1.0:
+  
+    quantBlockSize = min(quantBlockSize * 2, 128)
+    updated = True
+    print('increased quantBlockSize to ' + str(quantBlockSize))
+  elif torch.mean(torch.tensor(quant_bin_use_perc)) < quantUpdateLowThr:
+  # elif torch.mean(torch.tensor(quant_bin_use_perc)) < 0.5:
+    quantBlockSize = max(quantBlockSize // 2, 2)
+    updated = True
+    print('decreased quantBlockSize to ' + str(quantBlockSize))
+  
+  if updated:
+    balanced_scale_calibration_fwd(memory_tuple, None, None, None, model,
+                                   device, data_manager, replay,
+                                   recursion=True)
 
 
 def update_scale(m, c_path='',):
@@ -367,9 +424,10 @@ def dynamic_stoch(x, scale=1):
   xq_ord = torch.floor(x.abs())
 
   qe = x.abs() - xq_ord
-
-  flip = torch.bernoulli(qe)
-
+  try:
+    flip = torch.bernoulli(qe)
+  except:
+    import pdb; pdb.set_trace()
   xq = xq_ord + flip
 
   xq = torch.reshape(sign * xq, dim)
@@ -427,6 +485,12 @@ class FLinearQ(torch.autograd.Function):
       scale = mx / (2**(quantBits - 1) )
       w = torch.clamp(w, -mx-1, mx-1)
       w = torch.round(w / (scale + 1e-32))
+      if quantUpdateScalePhase:
+        # get usage percent of quant bins
+        global quant_bin_use_perc
+        import pdb; pdb.set_trace()
+        quant_bin_use_perc.append(torch.unique(w).shape[0] / (2**(quantBits - 1) * 2))
+      
 
 
     global current_uname
@@ -437,6 +501,13 @@ class FLinearQ(torch.autograd.Function):
       # requantize to acc BW (clamp to big values - no scale)
       n = 2**quantAccBits / 2 - 1
       output = torch.clamp(output, -n, n)
+
+      if quantUpdateScalePhase:
+        global scale_library
+        global current_uname
+        scale_library[current_uname] = (int(torch.sum(output == 0.))/np.prod(output.shape),
+                                        max(int(torch.sum(output == n))/np.prod(output.shape),
+                                            int(torch.sum(output == -n))/np.prod(output.shape)))
 
       fin_output += output
 
@@ -479,7 +550,10 @@ class FLinearQ(torch.autograd.Function):
       raise Exception('not implemented')
       grad_output_h1 = dynamic_squant(grad_output_h1)
     elif quantBWDGrad1 == 'stoch':
-      grad_output_h1, sg1 = dynamic_stoch(grad_output_h1)
+      try:
+        grad_output_h1, sg1 = dynamic_stoch(grad_output_h1)
+      except:
+        import pdb; pdb.set_trace()
     elif quantBWDGrad1 == 'noq':
       grad_output_h1 = grad_output_h1
       sg1 = torch.tensor([1.0])
