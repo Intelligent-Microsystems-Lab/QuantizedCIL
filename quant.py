@@ -190,6 +190,8 @@ def place_quant(m, lin_w, lin_b, c_path='',):
             tmp_meth = Conv2d_Ours
           elif quantMethod == 'fp134':
             tmp_meth = Conv_FP134
+          elif quantMethod == 'fp130':
+            tmp_meth = Conv_FP134
           else:
             raise Exception('Unknown quant method: ' + quantMethod)
           setattr(m, attr_str,
@@ -213,6 +215,8 @@ def place_quant(m, lin_w, lin_b, c_path='',):
           elif quantMethod == 'ours':
             tmp_meth = Linear_Ours
           elif quantMethod == 'fp134':
+            tmp_meth = Linear_FP134
+          elif quantMethod == 'fp130':
             tmp_meth = Linear_FP134
           else:
             raise Exception('Unknown quant method: ' + quantMethod)
@@ -239,7 +243,7 @@ def place_quant(m, lin_w, lin_b, c_path='',):
                 # m.fc.sw.data = old_sw * scale_dyn_range
                 m.fc.weight.data = lin_w
             else:
-              if quantMethod == 'fp134':
+              if quantMethod == 'fp134' or quantMethod == 'fp130':
                 m.fc.module.weight.data = lin_w
               else:
                 m.fc.weight.data = lin_w

@@ -13,4 +13,9 @@ export LD_LIBRARY_PATH=/afs/crc.nd.edu/user/c/cschaef6/.local/lib/nccl_2.17.1-1+
 
 # python3 main.py -model $2 -p benchmark -seed $1 --dataset="cifar100" --init_cls=20 -incre=20 --model_type="resnet32" --quantMethod="luq_corrected" --quantBits=4 --quantAccBits=12
 
-python3 main.py -model lwf -p benchmark -seed $1 --dataset="cifar100" --init_cls=100 -incre=0 --model_type="resnet32" --quantMethod="fp130" --quantBits=4 --quantAccBits=16
+# python3 main.py -model lwf -p benchmark -seed $1 --dataset="cifar100" --init_cls=100 -incre=0 --model_type="resnet32" --quantMethod="luq_corrected" --quantBits=4 --quantAccBits=12
+
+
+# python3 main.py -model icarl -p benchmark -seed $1 --dataset="cifar100" --init_cls=100 -incre=0 --model_type="resnet32" --quantMethod="ours" --quantBits=4 --quantAccBits=12 --quantFWDWgt="int" --quantFWDAct="int" --quantBWDAct="stoch" --quantBWDWgt="int" --quantBWDGrad1="stoch" --quantBWDGrad2="stoch" --quantBlockSize=32
+
+python3 main.py -model lwf -p benchmark -seed $1 --dataset="cifar100" --init_cls=100 -incre=0 --model_type="resnet32" --quantMethod="fp130"
