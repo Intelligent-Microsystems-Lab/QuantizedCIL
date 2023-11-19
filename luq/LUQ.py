@@ -142,7 +142,7 @@ class Linear_LUQ(nn.Linear):
             # all
             output = F.linear(qinput, w_q, self.bias,)
 
-            # output = AccQuant.apply(output) * sw * sa
+            output = AccQuant.apply(output) * sw * sa
 
         else:
             output = F.linear(input, self.weight, self.bias,)
@@ -243,6 +243,12 @@ class GradStochasticClippingQ(Function):
                 grad_inputQ = torch.where(grad_input == 0, torch.tensor([0], dtype=torch.float,device=grad_output.device), grad_inputQ)
 
                 out.append(grad_inputQ)
+
+
+            # print('h')
+            # if torch.isnan(out[0]).any():
+            #     import pdb; pdb.set_trace()
+
             grad_input = sum(out) / repeatBwd
 
         else:

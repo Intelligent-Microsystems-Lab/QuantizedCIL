@@ -24,6 +24,9 @@ track_layer_list = ['_convnet_conv_1_3x3', '_convnet_stage_1_2_conv_b',
                     '_convnet_stage_2_4_conv_a', '_convnet_stage_3_3_conv_a', '_fc']
 grad_quant_bias = {}
 
+# bias_track = []
+# var_track = []
+
 # TODO @clee1994 turn off for speed
 # torch.autograd.set_detect_anomaly(True)
 
@@ -186,7 +189,10 @@ class iCaRL(BaseLearner):
         self.replay_train(test_loader, optimizer, scheduler, data_manager, mem_samples, mem_targets)
 
 
-  
+    # with open('../bias_noquant.npy', 'wb') as f:
+    #   np.save(f, np.array([float(x) for x in bias_track]))
+    # with open('../var_noquant.npy', 'wb') as f:
+    #   np.save(f, np.array([float(x) for x in var_track]))
 
     # if quant.quantTrack:
     #     # save grads
@@ -257,10 +263,13 @@ class iCaRL(BaseLearner):
 
 
         logits = self._network(inputs)["logits"]
+        # import pdb; pdb.set_trace()
         loss = F.cross_entropy(logits, targets)
         optimizer.zero_grad()
         loss.backward()
-
+        # import pdb; pdb.set_trace()
+        # bias_track.append(self._network.backbone.net[1].lw.weight.grad.mean())
+        # var_track.append(self._network.backbone.net[1].lw.weight.grad.std())
 
         # backup_w = copy.deepcopy({k:x for k, x in self._network.named_parameters()})
         optimizer.step()
@@ -353,6 +362,9 @@ class iCaRL(BaseLearner):
         loss = loss_clf + loss_kd
         optimizer.zero_grad()
         loss.backward()
+        # import pdb; pdb.set_trace()
+        # bias_track.append(self._network.backbone.net[1].lw.weight.grad.mean())
+        # var_track.append(self._network.backbone.net[1].lw.weight.grad.std())
 
         optimizer.step()
         losses += loss.item()
