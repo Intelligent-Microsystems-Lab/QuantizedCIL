@@ -28,4 +28,4 @@ class Forgetting:
         for cls in self.max_acc_cls_dic:
             forgetting += max_acc_cls_dic[cls] - acc_cls_dic[cls]
         forgetting = forgetting / len(max_acc_cls_dic)
-        return forgetting
+        return round(forgetting,2)

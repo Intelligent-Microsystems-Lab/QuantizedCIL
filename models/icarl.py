@@ -18,7 +18,7 @@ from utils.data_manager import DummyDataset
 from datetime import datetime
 import quant
 
-import lptorch as lp
+# import lptorch as lp
 
 track_layer_list = ['_convnet_conv_1_3x3', '_convnet_stage_1_2_conv_b',
                     '_convnet_stage_2_4_conv_a', '_convnet_stage_3_3_conv_a', '_fc']
@@ -214,7 +214,8 @@ class iCaRL(BaseLearner):
     return new_samples, new_targets
 
 
-  def replay_train(self, test_loader, optimizer, scheduler, data_manager, mem_samples, mem_targets):
+  def replay_train(self, test_loader, optimizer, scheduler, data_manager,
+                   mem_samples, mem_targets):
     
     old_qbits = quant.quantBits
     old_accbits = quant.quantAccBits 
@@ -240,7 +241,8 @@ class iCaRL(BaseLearner):
     quant.quantBits = old_qbits
 
 
-  def _init_train(self, train_loader, test_loader, optimizer, scheduler, data_manager, nr_epochs=False):
+  def _init_train(self, train_loader, test_loader, optimizer, scheduler,
+                  data_manager, nr_epochs=False):
     if nr_epochs:
       prog_bar = tqdm(range(nr_epochs))
     else:
@@ -252,6 +254,12 @@ class iCaRL(BaseLearner):
       losses = 0.0
       correct, total = 0, 0
       for i, (_, inputs, targets) in enumerate(train_loader):
+
+        # ===========================
+        # data collection for quantization
+        quant.batchnr = i
+        quant.epochnr = epoch
+        # ===========================
 
         inputs, targets = inputs.to(self._device), targets.to(self._device)
 
@@ -327,7 +335,8 @@ class iCaRL(BaseLearner):
       prog_bar.set_description(info)
     logging.info(info)
 
-  def _update_representation(self, train_loader, test_loader, optimizer, scheduler, data_manager, nr_epochs=False):
+  def _update_representation(self, train_loader, test_loader, optimizer,
+                             scheduler, data_manager, nr_epochs=False):
     if nr_epochs:
       prog_bar = tqdm(range(nr_epochs))
     else:
@@ -339,6 +348,13 @@ class iCaRL(BaseLearner):
       losses = 0.0
       correct, total = 0, 0
       for i, (_, inputs, targets) in enumerate(train_loader):
+
+        # ===========================
+        # data collection for quantization
+        quant.batchnr = i
+        quant.epochnr = epoch
+        # ===========================
+
         inputs, targets = inputs.to(self._device), targets.to(self._device)
         logits = self._network(inputs)["logits"]
         # backup_w = copy.deepcopy({k:x for k, x in self._network.named_parameters()})

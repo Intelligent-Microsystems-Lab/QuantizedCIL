@@ -1,5 +1,6 @@
 import logging
 import numpy as np
+import torch
 from PIL import Image
 from torch.utils.data import Dataset
 from torchvision import transforms
@@ -197,6 +198,14 @@ class DataManager(object):
     y = self._train_targets
     return np.sum(np.where(y == index))
 
+def reorganize_image_data(data):
+  if type(data[0]) == torch.Tensor:
+    data = np.array([d.numpy() for d in data])
+    if data[0].shape[0] == 3:
+      data = np.array([np.transpose(d, (1, 2, 0)) for d in data])
+    if type(data[0][0][0][0]) != np.uint8:
+      data = np.array([(d*255).astype(np.uint8) for d in data])
+  return data
 
 class DummyDataset(Dataset):
   def __init__(self, data, labels, trsf, use_path=False, datatype="image"):
@@ -206,16 +215,25 @@ class DummyDataset(Dataset):
     self.trsf = trsf
     self.use_path = use_path
     self.datatype = datatype
-
+    if self.datatype == "image":
+      self.data = reorganize_image_data(self.data)
   def __len__(self):
     return len(self.data)
 
   def __getitem__(self, idx):
     if self.datatype == "image":
+
       if self.use_path:
         data = self.trsf(pil_loader(self.data[idx]))
       else:
-        data = self.trsf(Image.fromarray(self.data[idx]))
+        try:
+          data = self.trsf(Image.fromarray(self.data[idx]))
+          
+        except:
+          try:
+            data = self.trsf(pil_loader(self.data[idx]))
+          except:
+            import pdb; pdb.set_trace()
     else:
       data = self.trsf(self.data[idx])
     label = self.labels[idx]

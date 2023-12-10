@@ -178,11 +178,24 @@ def _train(args):
   cost_time = end_time - start_time
   save_time(args, cost_time)
   save_results(args, cnn_curve, nme_curve, no_nme)
+  try:
+    np.save(f"logs/{args['dataset']}/{args['model_name']}/bin_usage/{args['model_type']}_{args['quantMethod']}_{args['seed']}.npy", quant.quant_bin_use_hist)
+    np.save(f"logs/{args['dataset']}/{args['model_name']}/under_overflow/{args['model_type']}_{args['quantMethod']}_{args['seed']}.npy", quant.scale_library_hist)
+    np.save(f"logs/{args['dataset']}/{args['model_name']}/gradients/{args['model_type']}_{args['quantMethod']}_{args['seed']}.npy", quant.gradient_library)
+
+  except:
+    os.makedirs(f"logs/{args['dataset']}/{args['model_name']}/bin_usage/", exist_ok=True)
+    os.makedirs(f"logs/{args['dataset']}/{args['model_name']}/under_overflow/", exist_ok=True)
+    os.makedirs(f"logs/{args['dataset']}/{args['model_name']}/gradients/", exist_ok=True)
+    np.save(f"logs/{args['dataset']}/{args['model_name']}/bin_usage/{args['model_type']}_{args['quantMethod']}_{args['seed']}.npy", quant.quant_bin_use_hist)
+    np.save(f"logs/{args['dataset']}/{args['model_name']}/under_overflow/{args['model_type']}_{args['quantMethod']}_{args['seed']}.npy", quant.scale_library_hist)
+    np.save(f"logs/{args['dataset']}/{args['model_name']}/gradients/{args['model_type']}_{args['quantMethod']}_{args['seed']}.npy", quant.gradient_library)
   if args['model_name'] not in ["podnet", "coil"]:
     save_fc(args, model)
   else:
     save_model(args, model)
 
+  # import pdb; pdb.set_trace()
 
 def _set_device(args):
   device_type = args["device"]

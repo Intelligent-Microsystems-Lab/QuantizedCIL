@@ -16,7 +16,7 @@ from utils.data_manager import DataManager
 from datetime import datetime
 import quant
 
-import lptorch as lp
+# import lptorch as lp
 
 track_layer_list = ['_convnet_conv_1_3x3', '_convnet_stage_1_2_conv_b',
                     '_convnet_stage_2_4_conv_a', '_convnet_stage_3_3_conv_a', '_fc']
@@ -46,7 +46,7 @@ class LwF(BaseLearner):
     logging.info(
         "Learning on {}-{}".format(self._known_classes, self._total_classes)
     )
-
+    print(self._network.fc.weight.shape)
     lin_w, lin_b = quant.save_lin_params(self._network)
     if quant.quantTrack:
       quant.place_track(self._network, track_layer_list, '', lin_w, lin_b)

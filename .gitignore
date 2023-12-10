@@ -1,6 +1,7 @@
 # Added
 data/*
 logs/*
+figures/*
 results/*
 track_stats/*
 vizier_quant_cont/*

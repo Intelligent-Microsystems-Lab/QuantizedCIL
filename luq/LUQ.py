@@ -13,6 +13,13 @@ from torch.autograd.function import InplaceFunction
 corrected_version = False
 quantAccBits = 8
 
+epochnr = 0
+batchnr = 0
+gradient_library = {}
+scale_library = {}
+scale_library_hist = []
+quant_range_use_perc = {}
+
 class Conv2d_LUQ(nn.Conv2d):
     """docstring for Conv2d_BF16."""
 
@@ -70,8 +77,10 @@ class Conv2d_LUQ(nn.Conv2d):
             output = F.conv2d(qinput, w_q, self.bias, self.stride,
                               self.padding, self.dilation, self.groups)
 
-            if quantAccBits < 16:
+            if False and quantAccBits < 16:
                 output = AccQuant.apply(output) * sw * sa
+            else:
+                output = output * sw * sa
 
         else:
             output = F.conv2d(input, self.weight, self.bias, self.stride,
@@ -141,7 +150,10 @@ class Linear_LUQ(nn.Linear):
             #all
             output = F.linear(qinput, w_q, self.bias,)
 
-            # output = AccQuant.apply(output) * sw * sa
+            if False and quantAccBits < 16:
+                output = AccQuant.apply(output) * sw * sa
+            else:
+                output = output * sw * sa
 
         else:
             output = F.linear(input, self.weight, self.bias,)
@@ -239,12 +251,27 @@ class GradStochasticClippingQ(Function):
 
                 out.append(grad_inputQ)
             grad_input = sum(out) / repeatBwd
+            if False and quantAccBits < 16:
+                grad_inputq = AccQuant.apply(grad_input)
+            else:
+                grad_inputq = grad_input 
+
+            # global batchnr
+            # global epochnr
+            # if batchnr==0 and epochnr%50==0:
+            #     global gradient_library
+            #     global current_uname
+            #     if current_uname not in gradient_library:
+            #         gradient_library[current_uname] = {"gradnoq": [], "gradq": [], "gradqacc": []}
+            #     gradient_library[current_uname]["gradnoq"].append(grad_output.detach().cpu().numpy())
+            #     gradient_library[current_uname]["gradq"].append(grad_input.detach().cpu().numpy())
+            #     gradient_library[current_uname]["gradqacc"].append(grad_inputq.detach().cpu().numpy())
 
         else:
 
-            grad_input = grad_output
+            grad_inputq = grad_output
 
         # assert torch.unique(grad_input).shape[0] <= 16
-        return grad_input,None, None,None
+        return grad_inputq,None, None,None
 
 
