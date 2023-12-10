@@ -67,7 +67,7 @@ QnA = None
 
 quantGradMxScale = 1.
 
-quantFP134_rep = '555555543210'# '11111110'
+quantFP134_rep = '11111110' #  '555555543210'# 
 
 epochnr = 0
 batchnr = 0
@@ -151,7 +151,7 @@ def init_properties(obj, uname):
   obj.uname = uname
 
 def set_lptorch_quant():
-  df_format = [int(x) for x in list('555555543210')] #  [int(x) for x in list(quantFP134_rep)]#$
+  df_format = [int(x) for x in list('555555543210')] #  [int(x) for x in list(quantFP134_rep)] #$  
   n_format = [int(x) for x in list(quantFP134_rep)]
   lp.set_activ_quant(lp.quant.quant(lp.quant.custom_fp_format(df_format), room=1, stochastic=False))
   lp.set_error_quant(lp.quant.quant(lp.quant.custom_fp_format(df_format), room=1, stochastic=True))
@@ -195,6 +195,8 @@ def place_quant(m, lin_w, lin_b, c_path='',):
             tmp_meth = Conv2d_Ours
           elif quantMethod == 'fp134':
             tmp_meth = Conv_FP134
+          elif quantMethod == 'fp130':
+            tmp_meth = Conv_FP134
           else:
             raise Exception('Unknown quant method: ' + quantMethod)
           setattr(m, attr_str,
@@ -218,6 +220,8 @@ def place_quant(m, lin_w, lin_b, c_path='',):
           elif quantMethod == 'ours':
             tmp_meth = Linear_Ours
           elif quantMethod == 'fp134':
+            tmp_meth = Linear_FP134
+          elif quantMethod == 'fp130':
             tmp_meth = Linear_FP134
           else:
             raise Exception('Unknown quant method: ' + quantMethod)
@@ -244,7 +248,7 @@ def place_quant(m, lin_w, lin_b, c_path='',):
                 # m.fc.sw.data = old_sw * scale_dyn_range
                 m.fc.weight.data = lin_w
             else:
-              if quantMethod == 'fp134':
+              if quantMethod == 'fp134' or quantMethod == 'fp130':
                 m.fc.module.weight.data = lin_w
               else:
                 m.fc.weight.data = lin_w
@@ -521,8 +525,9 @@ class FLinearQ(torch.autograd.Function):
     for i in range(int(np.ceil( x.shape[1]/quantBlockSize ))):
       output = F.linear(x[:,i*quantBlockSize:(i+1)*quantBlockSize], w[:,i*quantBlockSize:(i+1)*quantBlockSize])
       # requantize to acc BW (clamp to big values - no scale)
-      n = 2**quantAccBits / 2 - 1
-      output = torch.clamp(output, -n, n)
+      if quantAccBits < 16:
+        n = 2**quantAccBits / 2 - 1
+        output = torch.clamp(output, -n, n)
 
       if quantUpdateScalePhase:
         global scale_library
@@ -586,8 +591,10 @@ class FLinearQ(torch.autograd.Function):
 
     grad_input = (grad_output_h1 @ w_h1) 
 
-    n = 2**quantAccBits / 2 - 1
-    grad_input = torch.clamp(grad_input, -n, n)
+    if quantAccBits < 16:
+      n = 2**quantAccBits / 2 - 1
+      grad_input = torch.clamp(grad_input, -n, n)
+    
     # get bias 
     # or kl div
     global batchnr
@@ -657,8 +664,9 @@ class FLinearQ(torch.autograd.Function):
 
     grad_w = (grad_output_h2 @ x_h2) 
 
-    n = 2**quantAccBits / 2 - 1
-    grad_w = torch.clamp(grad_w, -n, n)
+    if quantAccBits < 16:
+      n = 2**quantAccBits / 2 - 1
+      grad_w = torch.clamp(grad_w, -n, n)
 
     return grad_input * sg1 * swh1 * sw * 1 / biggest_power2_factor(h_out.shape[0]), grad_w * sg2 * sxh2 * sx * 1 / biggest_power2_factor(h_bs.shape[0]), None, None, None, None
 

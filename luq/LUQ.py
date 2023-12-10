@@ -87,6 +87,7 @@ class Conv2d_LUQ(nn.Conv2d):
                               self.padding, self.dilation, self.groups)
 
         output = GradStochasticClippingQ.apply(output, self.quantizeBwd,self.layerIdx,self.repeatBwd)
+
         return output
 
 
@@ -147,7 +148,7 @@ class Linear_LUQ(nn.Linear):
 
 
 
-            #all
+            # all
             output = F.linear(qinput, w_q, self.bias,)
 
             if False and quantAccBits < 16:
@@ -165,6 +166,10 @@ class Linear_LUQ(nn.Linear):
         #     import pdb; pdb.set_trace()
 
         output = GradStochasticClippingQ.apply(output, self.quantizeBwd,self.layerIdx,self.repeatBwd)
+
+        # if torch.isnan(output).any():
+        #     import pdb; pdb.set_trace()
+
         return {'logits': output}
 
 
@@ -178,7 +183,7 @@ class UniformQuantizeSawb(InplaceFunction):
         with torch.no_grad():
             clip = (c1*torch.sqrt(torch.mean(input**2))) - (c2*torch.mean(input.abs()))
             scale = 2*clip / (Qp - Qn)
-            output.div_(scale)
+            output.div_(scale + 1e-5)
             output.clamp_(Qn, Qp).round_()
             # output.mul_(scale)
         return output, scale
@@ -250,6 +255,12 @@ class GradStochasticClippingQ(Function):
                 grad_inputQ = torch.where(grad_input == 0, torch.tensor([0], dtype=torch.float,device=grad_output.device), grad_inputQ)
 
                 out.append(grad_inputQ)
+
+
+            # print('h')
+            # if torch.isnan(out[0]).any():
+            #     import pdb; pdb.set_trace()
+
             grad_input = sum(out) / repeatBwd
             if False and quantAccBits < 16:
                 grad_inputq = AccQuant.apply(grad_input)
