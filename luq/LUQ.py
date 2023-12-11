@@ -11,7 +11,7 @@ from torch.autograd import Variable
 from torch.autograd.function import InplaceFunction
 
 corrected_version = False
-quantAccBits = 8
+quantAccBits = 16
 
 epochnr = 0
 batchnr = 0
@@ -77,7 +77,7 @@ class Conv2d_LUQ(nn.Conv2d):
             output = F.conv2d(qinput, w_q, self.bias, self.stride,
                               self.padding, self.dilation, self.groups)
 
-            if False and quantAccBits < 16:
+            if quantAccBits < 16:
                 output = AccQuant.apply(output) * sw * sa
             else:
                 output = output * sw * sa
@@ -151,7 +151,7 @@ class Linear_LUQ(nn.Linear):
             # all
             output = F.linear(qinput, w_q, self.bias,)
 
-            if False and quantAccBits < 16:
+            if quantAccBits < 16:
                 output = AccQuant.apply(output) * sw * sa
             else:
                 output = output * sw * sa
@@ -262,10 +262,10 @@ class GradStochasticClippingQ(Function):
             #     import pdb; pdb.set_trace()
 
             grad_input = sum(out) / repeatBwd
-            if False and quantAccBits < 16:
-                grad_inputq = AccQuant.apply(grad_input)
-            else:
-                grad_inputq = grad_input 
+            # if False and quantAccBits < 16:
+            #     grad_inputq = AccQuant.apply(grad_input)
+            # else:
+            #     grad_inputq = grad_input 
 
             # global batchnr
             # global epochnr
@@ -276,13 +276,13 @@ class GradStochasticClippingQ(Function):
             #         gradient_library[current_uname] = {"gradnoq": [], "gradq": [], "gradqacc": []}
             #     gradient_library[current_uname]["gradnoq"].append(grad_output.detach().cpu().numpy())
             #     gradient_library[current_uname]["gradq"].append(grad_input.detach().cpu().numpy())
-            #     gradient_library[current_uname]["gradqacc"].append(grad_inputq.detach().cpu().numpy())
+            #     # gradient_library[current_uname]["gradqacc"].append(grad_inputq.detach().cpu().numpy())
 
         else:
 
-            grad_inputq = grad_output
+            grad_input = grad_output
 
         # assert torch.unique(grad_input).shape[0] <= 16
-        return grad_inputq,None, None,None
+        return grad_input,None, None,None
 
 
