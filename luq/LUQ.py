@@ -12,6 +12,7 @@ from torch.autograd.function import InplaceFunction
 
 corrected_version = False
 quantAccBits = 16
+quantAccFWD = False
 
 epochnr = 0
 batchnr = 0
@@ -80,7 +81,7 @@ class Conv2d_LUQ(nn.Conv2d):
             output = F.conv2d(qinput, w_q, self.bias, self.stride,
                               self.padding, self.dilation, self.groups)
 
-            if quantAccBits < 16:
+            if quantAccFWD and quantAccBits < 16:
                 output = AccQuant.apply(output) #* sw * sa
             else:
                 output = output #* sw * sa
@@ -157,7 +158,7 @@ class Linear_LUQ(nn.Linear):
             # all
             output = F.linear(qinput, w_q, self.bias,)
 
-            if quantAccBits < 16:
+            if quantAccFWD and quantAccBits < 16:
                 output = AccQuant.apply(output) #* sw * sa
             else:
                 output = output #* sw * sa

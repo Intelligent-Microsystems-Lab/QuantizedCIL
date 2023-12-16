@@ -96,6 +96,8 @@ def setup_parser():
   parser.add_argument('--quantReplaySize', '-qRS', type=int, default=0,)
   parser.add_argument('--quantHadOff', action="store_true")
   parser.add_argument('--quantAccBits', type=int, default=16)
+  parser.add_argument('--quantAccFWD', action="store_true")
+  parser.add_argument('--quantAccBWD', action="store_true")
   parser.add_argument('--quantRequantize', type=bool, default=True)
 
   # training parameters

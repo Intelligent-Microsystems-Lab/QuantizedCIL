@@ -38,6 +38,8 @@ quantCalibrate = "max"
 quantTrack = False
 quantBits = 4
 quantAccBits = 8
+quantAccFWD = False
+quantAccBWD = False
 quantWgtStoreBits = 8
 quantMethod = 'ours'
 quantBatchSize = 128
@@ -521,7 +523,7 @@ class FLinearQ(torch.autograd.Function):
     for i in range(int(np.ceil( x.shape[1]/quantBlockSize ))):
       output = F.linear(x[:,i*quantBlockSize:(i+1)*quantBlockSize], w[:,i*quantBlockSize:(i+1)*quantBlockSize])
       # requantize to acc BW (clamp to big values - no scale)
-      if quantAccBits < 16:
+      if quantAccFWD and quantAccBits < 16:
         n = 2**quantAccBits / 2 - 1
         output = torch.clamp(output, -n, n)
 
@@ -588,7 +590,7 @@ class FLinearQ(torch.autograd.Function):
     grad_input = (grad_output_h1 @ w_h1) 
     grad_input_noq = grad_output @ w
     grad_input_copy = copy.deepcopy(grad_input.detach())
-    if quantAccBits < 16:
+    if quantAccBWD and quantAccBits < 16:
       n = 2**quantAccBits / 2 - 1
       grad_input = torch.clamp(grad_input, -n, n)
     # get bias 
