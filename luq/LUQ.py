@@ -59,6 +59,9 @@ class Conv2d_LUQ(nn.Conv2d):
         self.c2 = 12.2
         self.stochastic = True
         self.repeatBwd = 1
+
+        self.uname = uname
+
     def forward(self, input):
         if self.quantizeFwd:
             w_q, sw = UniformQuantizeSawb.apply(self.weight,self.c1,self.c2,self.QpW,self.QnW)
@@ -78,15 +81,15 @@ class Conv2d_LUQ(nn.Conv2d):
                               self.padding, self.dilation, self.groups)
 
             if quantAccBits < 16:
-                output = AccQuant.apply(output) * sw * sa
+                output = AccQuant.apply(output) #* sw * sa
             else:
-                output = output * sw * sa
+                output = output #* sw * sa
 
         else:
             output = F.conv2d(input, self.weight, self.bias, self.stride,
                               self.padding, self.dilation, self.groups)
 
-        output = GradStochasticClippingQ.apply(output, self.quantizeBwd,self.layerIdx,self.repeatBwd)
+        output = GradStochasticClippingQ.apply(output, self.quantizeBwd,self.layerIdx,self.repeatBwd, self.uname)
 
         return output
 
@@ -131,6 +134,9 @@ class Linear_LUQ(nn.Linear):
         self.c2 = 12.2
         self.stochastic = True
         self.repeatBwd = 1
+
+        self.uname = uname
+
     def forward(self, input):
 
         if self.quantizeFwd:
@@ -152,9 +158,9 @@ class Linear_LUQ(nn.Linear):
             output = F.linear(qinput, w_q, self.bias,)
 
             if quantAccBits < 16:
-                output = AccQuant.apply(output) * sw * sa
+                output = AccQuant.apply(output) #* sw * sa
             else:
-                output = output * sw * sa
+                output = output #* sw * sa
 
         else:
             output = F.linear(input, self.weight, self.bias,)
@@ -165,7 +171,7 @@ class Linear_LUQ(nn.Linear):
         # except:
         #     import pdb; pdb.set_trace()
 
-        output = GradStochasticClippingQ.apply(output, self.quantizeBwd,self.layerIdx,self.repeatBwd)
+        output = GradStochasticClippingQ.apply(output, self.quantizeBwd,self.layerIdx,self.repeatBwd, self.uname)
 
         # if torch.isnan(output).any():
         #     import pdb; pdb.set_trace()
@@ -183,9 +189,9 @@ class UniformQuantizeSawb(InplaceFunction):
         with torch.no_grad():
             clip = (c1*torch.sqrt(torch.mean(input**2))) - (c2*torch.mean(input.abs()))
             scale = 2*clip / (Qp - Qn)
-            output.div_(scale + 1e-5)
+            output.div_(scale + 1e-10)
             output.clamp_(Qn, Qp).round_()
-            # output.mul_(scale)
+            output.mul_(scale)
         return output, scale
 
     @staticmethod
@@ -218,8 +224,9 @@ class AccQuant(InplaceFunction):
 class GradStochasticClippingQ(Function):
 
     @staticmethod
-    def forward(ctx, x, quantizeBwd,layerIdx,repeatBwd):
+    def forward(ctx, x, quantizeBwd,layerIdx,repeatBwd, uname=None):
         ctx.save_for_backward(torch.tensor(quantizeBwd),torch.tensor(layerIdx),torch.tensor(repeatBwd))
+        ctx.uname = uname
         return x
 
     @staticmethod
@@ -262,27 +269,25 @@ class GradStochasticClippingQ(Function):
             #     import pdb; pdb.set_trace()
 
             grad_input = sum(out) / repeatBwd
-            # if False and quantAccBits < 16:
+            # if quantAccBits < 16:
             #     grad_inputq = AccQuant.apply(grad_input)
             # else:
             #     grad_inputq = grad_input 
 
-            # global batchnr
-            # global epochnr
-            # if batchnr==0 and epochnr%50==0:
-            #     global gradient_library
-            #     global current_uname
-            #     if current_uname not in gradient_library:
-            #         gradient_library[current_uname] = {"gradnoq": [], "gradq": [], "gradqacc": []}
-            #     gradient_library[current_uname]["gradnoq"].append(grad_output.detach().cpu().numpy())
-            #     gradient_library[current_uname]["gradq"].append(grad_input.detach().cpu().numpy())
-            #     # gradient_library[current_uname]["gradqacc"].append(grad_inputq.detach().cpu().numpy())
+            global batchnr
+            global epochnr
+            if batchnr==0 and epochnr%50==0:
+                global gradient_library
+                if ctx.uname not in gradient_library:
+                    gradient_library[ctx.uname] = {"gradnoq": [], "gradq": [], "gradqacc": []}
+                gradient_library[ctx.uname]["gradnoq"].append(grad_output.detach().cpu().numpy())
+                gradient_library[ctx.uname]["gradq"].append(grad_input.detach().cpu().numpy())
 
         else:
 
             grad_input = grad_output
 
         # assert torch.unique(grad_input).shape[0] <= 16
-        return grad_input,None, None,None
+        return grad_input,None, None,None, None
 
 

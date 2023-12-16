@@ -614,9 +614,9 @@ class FLinearQ(torch.autograd.Function):
       else:
         raise Exception("check weird")
       if uname not in gradient_library:
-        gradient_library[uname] = {"gradnoq": [], "gradqnoacc": [], "gradqacc": []}
+        gradient_library[uname] = {"gradnoq": [], "gradq": [], "gradqacc": []}
       gradient_library[uname]["gradnoq"].append(grad_input_noq.detach().cpu().numpy())
-      gradient_library[uname]["gradqnoacc"].append(grad_input_copy.cpu().numpy())
+      gradient_library[uname]["gradq"].append(grad_input_copy.cpu().numpy())
       gradient_library[uname]["gradqacc"].append(grad_input.detach().cpu().numpy())
       # import pdb; pdb.set_trace()
 
