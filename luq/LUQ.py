@@ -82,9 +82,9 @@ class Conv2d_LUQ(nn.Conv2d):
                               self.padding, self.dilation, self.groups)
 
             if quantAccFWD and quantAccBits < 16:
-                output = AccQuant.apply(output) #* sw * sa
+                output = AccQuant.apply((output / sw) /sa ) * sw * sa
             else:
-                output = output #* sw * sa
+                output = output
 
         else:
             output = F.conv2d(input, self.weight, self.bias, self.stride,
@@ -159,9 +159,9 @@ class Linear_LUQ(nn.Linear):
             output = F.linear(qinput, w_q, self.bias,)
 
             if quantAccFWD and quantAccBits < 16:
-                output = AccQuant.apply(output) #* sw * sa
+                output = AccQuant.apply((output / sw) /sa )  * sw * sa
             else:
-                output = output #* sw * sa
+                output = output
 
         else:
             output = F.linear(input, self.weight, self.bias,)
@@ -189,8 +189,8 @@ class UniformQuantizeSawb(InplaceFunction):
 
         with torch.no_grad():
             clip = (c1*torch.sqrt(torch.mean(input**2))) - (c2*torch.mean(input.abs()))
-            scale = 2*clip / (Qp - Qn)
-            output.div_(scale + 1e-10)
+            scale = (2*clip / (Qp - Qn)) + 1e-10
+            output.div_(scale )
             output.clamp_(Qn, Qp).round_()
             output.mul_(scale)
         return output, scale
