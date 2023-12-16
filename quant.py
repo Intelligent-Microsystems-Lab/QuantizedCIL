@@ -586,7 +586,8 @@ class FLinearQ(torch.autograd.Function):
       raise Exception('Grad rounding scheme not implemented: ' + quantBWDGrad1)
 
     grad_input = (grad_output_h1 @ w_h1) 
-
+    grad_input_noq = grad_output @ w
+    grad_input_copy = copy.deepcopy(grad_input.detach())
     if quantAccBits < 16:
       n = 2**quantAccBits / 2 - 1
       grad_input = torch.clamp(grad_input, -n, n)
@@ -613,9 +614,9 @@ class FLinearQ(torch.autograd.Function):
       else:
         raise Exception("check weird")
       if uname not in gradient_library:
-        gradient_library[uname] = {"gradnoq": [], "gradq": [], "gradqacc": []}
-      gradient_library[uname]["gradnoq"].append(grad_output.detach().cpu().numpy())
-      gradient_library[uname]["gradq"].append(grad_output_h1.detach().cpu().numpy())
+        gradient_library[uname] = {"gradnoq": [], "gradqnoacc": [], "gradqacc": []}
+      gradient_library[uname]["gradnoq"].append(grad_input_noq.detach().cpu().numpy())
+      gradient_library[uname]["gradqnoacc"].append(grad_input_copy.cpu().numpy())
       gradient_library[uname]["gradqacc"].append(grad_input.detach().cpu().numpy())
       # import pdb; pdb.set_trace()
 
