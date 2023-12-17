@@ -3,12 +3,18 @@ list=("42467"	"88801"	"91280"	"01056"	"27534"	"81619"	"79004"	"25824"	"66362"	"3
 
 model="icarl"
 bits="4"
-accbits="16"
+accbits=("16" "8")
 # quantMethod="luq_corrected"
-quantMethod="ours"
+quantMethod=("ours" "luq_corrected")
 
 # Loop over the list
+for abits in "${accbits[@]}"
+do
+for technique in "${quantMethod[@]}"
+do
 for i in "${list[@]}"
 do
-    bash run_dsads_acc.script "$i" "$model" "$bits" "$accbits" "$quantMethod" >> ./logs/${model}_cifar_${quantMethod}_${bits}fwd_w_int_a_int_bwd_w_int_a_stoch_g1_stoch_g2_stoch_acc_${accbits}_seed_${i}.txt
+    bash run_dsads_acc.script "$i" "$model" "$bits" "$abits" "$technique" >> ./logs/${model}_cifar_${technique}_${bits}fwd_w_int_a_int_bwd_w_int_a_stoch_g1_stoch_g2_stoch_acc_${abits}_seed_${i}.txt
+done
+done
 done
