@@ -150,34 +150,34 @@ class iCaRL(BaseLearner):
         optimizer = lp.optim.SGD(
             self._network.parameters(),
             momentum=0.9,
-            lr=self.args['init_lr'],
+            lr=self.args['lr'],
             weight_decay=self.args['init_weight_decay'],
             weight_quantize=False
         )
         scheduler = optim.lr_scheduler.MultiStepLR(
-            optimizer=optimizer, milestones=self.args['init_milestones'],
-            gamma=self.args['init_lr_decay']
+            optimizer=optimizer, milestones=self.args['milestones'],
+            gamma=self.args['lr_decay']
         )
       elif self.args["optimizer"] == "sgd":
         optimizer = optim.SGD(
             self._network.parameters(),
             momentum=0.9,
-            lr=self.args['init_lr'],
+            lr=self.args['lr'],
             weight_decay=self.args['init_weight_decay'],
         )
         scheduler = optim.lr_scheduler.MultiStepLR(
-            optimizer=optimizer, milestones=self.args['init_milestones'],
-            gamma=self.args['init_lr_decay']
+            optimizer=optimizer, milestones=self.args['milestones'],
+            gamma=self.args['lr_decay']
         )
       elif self.args["optimizer"] == "ours":
         optimizer = quant.QuantMomentumOptimizer(
             self._network.parameters(),
             momentum=0.9,
-            lr=self.args['init_lr'],
+            lr=self.args['lr'],
         )
         scheduler = optim.lr_scheduler.MultiStepLR(
-            optimizer=optimizer, milestones=self.args['init_milestones'],
-            gamma=self.args['init_lr_decay']
+            optimizer=optimizer, milestones=self.args['milestones'],
+            gamma=self.args['lr_decay']
         )
       else:
         raise NotImplementedError
@@ -187,7 +187,8 @@ class iCaRL(BaseLearner):
     if self.args["quantReplaySize"] > 0 and self._cur_task > 0:
       mem_samples, mem_targets = self._get_memory()
       if len(mem_samples) > 0:
-        self.replay_train(test_loader, optimizer, scheduler, data_manager, mem_samples, mem_targets)
+        self.replay_train(test_loader, optimizer, scheduler, data_manager,
+                          mem_samples, mem_targets)
 
 
     # with open('../bias_noquant.npy', 'wb') as f:
