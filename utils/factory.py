@@ -11,7 +11,7 @@ from models.bic import BiC
 # from models.podnet import PODNet
 # from models.rmm import RMM_FOSTER, RMM_iCaRL
 # from models.wa import WA
-# from models.memo import MEMO
+from models.memo import MEMO
 
 
 def get_model(model_name, args):

@@ -435,18 +435,17 @@ class DERNet(nn.Module):
         """
 
   def update_fc(self, nb_classes):
-    # import pdb; pdb.set_trace()
     if len(self.backbones) == 0:
       self.backbones.append(get_backbone(self.backbone_type, args=self.args))
     else:
       self.backbones.append(get_backbone(self.backbone_type, args=self.args))
-      # import pdb; pdb.set_trace()
       self.backbones[-1].load_state_dict({key: self.backbones[-2].state_dict()[key] for key in self.backbones[-2].state_dict() if key in self.backbones[-1].state_dict()})
 
     if self.out_dim is None:
       self.out_dim = self.backbones[-1].out_dim
     fc = self.generate_fc(self.feature_dim, nb_classes)
     if self.fc is not None:
+      # import pdb; pdb.set_trace()
       try:
         nb_output = self.fc.out_features
         weight = copy.deepcopy(self.fc.weight.data)
@@ -644,7 +643,7 @@ class FOSTERNet(nn.Module):
 
 
 class AdaptiveNet(nn.Module):
-  def __init__(self, backbone_type, pretrained):
+  def __init__(self, backbone_type, pretrained, args=None):
     super(AdaptiveNet, self).__init__()
     self.backbone_type = backbone_type
     self.TaskAgnosticExtractor, _ = get_backbone(
@@ -656,6 +655,7 @@ class AdaptiveNet(nn.Module):
     self.fc = None
     self.aux_fc = None
     self.task_sizes = []
+    self.args = args
 
   @property
   def feature_dim(self):
@@ -705,11 +705,22 @@ class AdaptiveNet(nn.Module):
       self.out_dim = self.AdaptiveExtractors[-1].feature_dim        
     fc = self.generate_fc(self.feature_dim, nb_classes)             
     if self.fc is not None:
-      nb_output = self.fc.out_features
-      weight = copy.deepcopy(self.fc.weight.data)
-      bias = copy.deepcopy(self.fc.bias.data)
-      fc.weight.data[:nb_output, :self.feature_dim - self.out_dim] = weight
-      fc.bias.data[:nb_output] = bias
+      try:
+        nb_output = self.fc.out_features
+        weight = copy.deepcopy(self.fc.weight.data)
+        fc.weight.data[:nb_output,:self.feature_dim-self.out_dim] = weight
+
+        if self.fc.bias is not None:
+          bias = copy.deepcopy(self.fc.bias.data)
+          fc.bias.data[:nb_output] = bias
+      except:
+        nb_output = self.fc.module.out_features
+        weight = copy.deepcopy(self.fc.module.weight.data)
+        fc.weight.data[:nb_output,:self.feature_dim-self.out_dim] = weight
+
+        if self.fc.module.bias is not None:
+          bias = copy.deepcopy(self.fc.module.bias.data)
+          fc.bias.data[:nb_output] = bias
 
     del self.fc
     self.fc = fc
@@ -719,7 +730,7 @@ class AdaptiveNet(nn.Module):
     self.aux_fc = self.generate_fc(self.out_dim, new_task_size + 1)
 
   def generate_fc(self, in_dim, out_dim):
-    fc = SimpleLinear(in_dim, out_dim)
+    fc = SimpleLinear(in_dim, out_dim, bias=self.args["bias"])
     return fc
 
   def copy(self):

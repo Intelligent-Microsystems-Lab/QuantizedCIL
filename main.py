@@ -120,6 +120,12 @@ def setup_parser():
   parser.add_argument('--fc_nr_hid', type=int, default=0)
   parser.add_argument('--half_dims', action="store_true")
 
+  # MEMO parameters
+  parser.add_argument('--train_base',action='store_true')
+  parser.add_argument('--train_adaptive',action='store_true')
+  parser.add_argument('--scheduler', type=str, default='steplr', choices=['steplr','cosine'])
+  parser.add_argument('--alpha_aux', type=float, default=1.0)
+
   # hyperparameter tuning
   # parser.add_argument('--init_dyn_scale', type=float, default=1.1)
   parser.add_argument('--dyn_scale', type=float, default=2.0)
