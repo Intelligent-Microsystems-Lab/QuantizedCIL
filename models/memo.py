@@ -62,7 +62,6 @@ class MEMO(BaseLearner):
             quant.place_quant(self._network, lin_w, lin_b)
         else:
           pass
-
         logging.info('All params: {}'.format(count_parameters(self._network)))
         logging.info('Trainable params: {}'.format(count_parameters(self._network, True)))
         train_dataset = data_manager.get_dataset(
@@ -190,7 +189,7 @@ class MEMO(BaseLearner):
             for i, (_, inputs, targets) in enumerate(train_loader):
                 inputs, targets = inputs.to(self._device), targets.to(self._device)
                 logits = self._network(inputs)['logits']
-
+                
                 loss=F.cross_entropy(logits,targets) 
                 optimizer.zero_grad()
                 loss.backward()

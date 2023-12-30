@@ -450,7 +450,6 @@ class DERNet(nn.Module):
       self.out_dim = self.backbones[-1].out_dim
     fc = self.generate_fc(self.feature_dim, nb_classes)
     if self.fc is not None:
-      # import pdb; pdb.set_trace()
       try:
         nb_output = self.fc.out_features
         weight = copy.deepcopy(self.fc.weight.data)
