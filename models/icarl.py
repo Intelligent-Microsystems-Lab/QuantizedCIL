@@ -365,6 +365,8 @@ class iCaRL(BaseLearner):
         # data collection for quantization
         quant.batchnr = i
         quant.epochnr = epoch
+        LUQ.batchnr = i
+        LUQ.epochnr = epoch
         # ===========================
 
         inputs, targets = inputs.to(self._device), targets.to(self._device)

@@ -279,11 +279,11 @@ class GradStochasticClippingQ(Function):
             global epochnr
             if batchnr==0 and epochnr%50==0:
                 global gradient_library
+                
                 if ctx.uname not in gradient_library:
                     gradient_library[ctx.uname] = {"gradnoq": [], "gradq": [], "gradqacc": []}
                 gradient_library[ctx.uname]["gradnoq"].append(grad_output.detach().cpu().numpy())
                 gradient_library[ctx.uname]["gradq"].append(grad_input.detach().cpu().numpy())
-
         else:
 
             grad_input = grad_output

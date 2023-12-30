@@ -191,7 +191,7 @@ def _train(args):
       np.save(f"logs/{args['dataset']}/{args['model_name']}/gradients/{args['model_type']}_{args['quantMethod']}_accbits_{args['quantAccBits']}_{args['seed']}.npy",
               quant.gradient_library)
     elif "luq" in args['quantMethod']:
-      np.save(f"logs/{args['dataset']}/{args['model_name']}/gradients/{args['model_type']}_{args['quantMethod']}_{args['seed']}.npy",
+      np.save(f"logs/{args['dataset']}/{args['model_name']}/gradients/{args['model_type']}_{args['quantMethod']}_accbits_{args['quantAccBits']}_{args['seed']}.npy",
               LUQ.gradient_library)
 
   except:
@@ -205,7 +205,7 @@ def _train(args):
       np.save(f"logs/{args['dataset']}/{args['model_name']}/gradients/{args['model_type']}_{args['quantMethod']}_accbits_{args['quantAccBits']}_{args['seed']}.npy",
               quant.gradient_library)
     elif "luq" in args['quantMethod']:
-      np.save(f"logs/{args['dataset']}/{args['model_name']}/gradients/{args['model_type']}_{args['quantMethod']}_{args['seed']}.npy",
+      np.save(f"logs/{args['dataset']}/{args['model_name']}/gradients/{args['model_type']}_{args['quantMethod']}_accbits_{args['quantAccBits']}_{args['seed']}.npy",
               LUQ.gradient_library)
   if args['model_name'] not in ["podnet", "coil"]:
     save_fc(args, model)

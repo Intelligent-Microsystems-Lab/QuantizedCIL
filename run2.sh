@@ -3,9 +3,9 @@ list=("42467"	"88801"	"91280"	"01056"	"27534"	"81619"	"79004"	"25824"	"66362"	"3
 
 model="icarl"
 bits="4"
-accbits=("16" "8")
+accbits=("8" )
 # quantMethod="luq_corrected"
-quantMethod=("ours" "luq_corrected")
+quantMethod=("luq_corrected")
 
 # Loop over the list
 for abits in "${accbits[@]}"
