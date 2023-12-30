@@ -9,7 +9,7 @@ from backbones.ucir_resnet import resnet18 as cosine_resnet18
 from backbones.ucir_resnet import resnet34 as cosine_resnet34
 from backbones.ucir_resnet import resnet50 as cosine_resnet50
 from backbones.linears import SimpleLinear, SplitCosineLinear, CosineLinear
-from backbones.fc_net import FCNet
+from backbones.fc_net import FCNet, get_memo_fcnet
 
 # FOR MEMO
 from backbones.memo_resnet import get_resnet18_imagenet as get_memo_resnet18  # for imagenet
@@ -66,7 +66,12 @@ def get_backbone(backbone_type, pretrained=False, args=None):
   elif name == 'memo_resnet32':
     _basenet, _adaptive_net = get_memo_resnet32()
     return _basenet, _adaptive_net
-
+  elif name == 'memo_fcnet':
+    _basenet, _adaptive_net = get_memo_fcnet(args["in_dim"], args["fc_hid_dim"],
+                                             args["in_dim"],args["fc_nr_hid"],
+                                             "relu", args["bias"],
+                                             args["half_dims"])
+    return _basenet, _adaptive_net
   # AUC
   # cifar
   elif name == 'conv2':
@@ -647,7 +652,7 @@ class AdaptiveNet(nn.Module):
     super(AdaptiveNet, self).__init__()
     self.backbone_type = backbone_type
     self.TaskAgnosticExtractor, _ = get_backbone(
-        backbone_type, pretrained)  # Generalized blocks
+        backbone_type, pretrained, args)  # Generalized blocks
     self.TaskAgnosticExtractor.train()
     self.AdaptiveExtractors = nn.ModuleList()  # Specialized Blocks
     self.pretrained = pretrained
@@ -664,16 +669,26 @@ class AdaptiveNet(nn.Module):
     return self.out_dim * len(self.AdaptiveExtractors)
 
   def extract_vector(self, x):
-    base_feature_map = self.TaskAgnosticExtractor(x)
-    features = [extractor(base_feature_map)
-                for extractor in self.AdaptiveExtractors]
+    if "fcnet" in self.backbone_type:
+      base_feature_map = self.TaskAgnosticExtractor(x)["features"]
+      features = [extractor(base_feature_map)["features"]
+                  for extractor in self.AdaptiveExtractors]
+    else:
+      base_feature_map = self.TaskAgnosticExtractor(x)
+      features = [extractor(base_feature_map)
+                  for extractor in self.AdaptiveExtractors]
     features = torch.cat(features, 1)
     return features
 
   def forward(self, x):
-    base_feature_map = self.TaskAgnosticExtractor(x)
-    features = [extractor(base_feature_map)
-                for extractor in self.AdaptiveExtractors]
+    if "fcnet" in self.backbone_type:
+      base_feature_map = self.TaskAgnosticExtractor(x)["features"]
+      features = [extractor(base_feature_map)["features"]
+                  for extractor in self.AdaptiveExtractors]
+    else:
+      base_feature_map = self.TaskAgnosticExtractor(x)
+      features = [extractor(base_feature_map)
+                  for extractor in self.AdaptiveExtractors]
     features = torch.cat(features, 1)
     out = self.fc(features)  # {logits: self.fc(features)}
 
@@ -692,7 +707,8 @@ class AdaptiveNet(nn.Module):
         '''
 
   def update_fc(self, nb_classes):
-    _, _new_extractor = get_backbone(self.backbone_type)
+    _, _new_extractor = get_backbone(self.backbone_type, self.pretrained,
+                                     self.args)
     if len(self.AdaptiveExtractors) == 0:
       self.AdaptiveExtractors.append(_new_extractor)
     else:
@@ -702,7 +718,10 @@ class AdaptiveNet(nn.Module):
 
     if self.out_dim is None:
       logging.info(self.AdaptiveExtractors[-1])
-      self.out_dim = self.AdaptiveExtractors[-1].feature_dim        
+      try:
+        self.out_dim = self.AdaptiveExtractors[-1].feature_dim        
+      except:
+        self.out_dim = self.AdaptiveExtractors[-1].out_dim
     fc = self.generate_fc(self.feature_dim, nb_classes)             
     if self.fc is not None:
       try:

@@ -79,3 +79,10 @@ class FCNet(nn.Module):
     return self.net[-1]
 
 
+def get_memo_fcnet(in_dim, hid_dim, out_dim, nr_hid_layers, act_fun="relu",
+                   bias=False, half_dims=False):
+  basenet = FCNet(in_dim, hid_dim, hid_dim, nr_hid_layers, act_fun="relu",
+                   bias=bias, half_dims=half_dims)
+  adaptivenet = FCNet(hid_dim, hid_dim, out_dim, nr_hid_layers=0, act_fun="relu",
+                   bias=bias, half_dims=half_dims)
+  return basenet, adaptivenet
