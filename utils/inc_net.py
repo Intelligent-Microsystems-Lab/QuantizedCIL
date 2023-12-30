@@ -714,7 +714,9 @@ class AdaptiveNet(nn.Module):
     else:
       self.AdaptiveExtractors.append(_new_extractor)
       self.AdaptiveExtractors[-1].load_state_dict(
-          self.AdaptiveExtractors[-2].state_dict())
+        {key: self.AdaptiveExtractors[-2].state_dict()[key] for key in self.AdaptiveExtractors[-2].state_dict() if key in self.AdaptiveExtractors[-1].state_dict()})
+      # self.AdaptiveExtractors[-1].load_state_dict(
+      #     self.AdaptiveExtractors[-2].state_dict())
 
     if self.out_dim is None:
       logging.info(self.AdaptiveExtractors[-1])
