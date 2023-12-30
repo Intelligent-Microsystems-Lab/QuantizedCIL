@@ -1,5 +1,5 @@
 # from models.coil import COIL
-# from models.der import DER
+from models.der import DER
 # from models.ewc import EWC
 # from models.finetune import Finetune
 # from models.foster import FOSTER
@@ -22,14 +22,12 @@ def get_model(model_name, args):
     return BiC(args)
   elif name == "lwf":
     return LwF(args)
-  else:
-    assert 0
   # elif name == "ewc":
   #     return EWC(args)
   # elif name == "wa":
   #     return WA(args)
-  # elif name == "der":
-  #     return DER(args)
+  elif name == "der":
+      return DER(args)
   # elif name == "finetune":
   #     return Finetune(args)
   # elif name == "replay":
@@ -38,14 +36,16 @@ def get_model(model_name, args):
   #     return GEM(args)
   # elif name == "coil":
   #     return COIL(args)
-  # elif name == "foster":
-  #     return FOSTER(args)
+  elif name == "foster":
+      return FOSTER(args)
   # elif name == "rmm-icarl":
   #     return RMM_iCaRL(args)
   # elif name == "rmm-foster":
   #     return RMM_FOSTER(args)
-  # elif name == 'memo':
-  #     return MEMO(args)
+  elif name == 'memo':
+      return MEMO(args)
   # elif name == "podnet":
   #     return PODNet(args)
+  else:
+    assert 0
 
