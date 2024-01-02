@@ -2,7 +2,7 @@
 from models.der import DER
 # from models.ewc import EWC
 # from models.finetune import Finetune
-# from models.foster import FOSTER
+from models.foster import FOSTER
 # from models.gem import GEM
 from models.icarl import iCaRL
 from models.lwf import LwF

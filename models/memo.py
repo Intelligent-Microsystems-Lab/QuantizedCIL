@@ -210,7 +210,7 @@ class MEMO(BaseLearner):
                 info = 'Task {}, Epoch {}/{} => Loss {:.3f}, Train_accy {:.2f}'.format(
                 self._cur_task, epoch+1, self.args['init_epoch'], losses/len(train_loader), train_acc)
             # prog_bar.set_description(info)
-            logging.info(info)
+        logging.info(info)
 
     def _update_representation(self, train_loader, test_loader, optimizer, scheduler):
         prog_bar = tqdm(range(self.args["epochs"]))

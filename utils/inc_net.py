@@ -535,7 +535,7 @@ class SimpleCosineIncrementalNet(BaseNet):
 
 
 class FOSTERNet(nn.Module):
-  def __init__(self, backbone_type, pretrained):
+  def __init__(self, backbone_type, pretrained, args=None):
     super(FOSTERNet, self).__init__()
     self.backbone_type = backbone_type
     self.backbones = nn.ModuleList()
@@ -545,6 +545,7 @@ class FOSTERNet(nn.Module):
     self.fe_fc = None
     self.task_sizes = []
     self.oldfc = None
+    self.args = args
 
   @property
   def feature_dim(self):
@@ -578,13 +579,22 @@ class FOSTERNet(nn.Module):
       self.out_dim = self.backbones[-1].out_dim
     fc = self.generate_fc(self.feature_dim, nb_classes)
     if self.fc is not None:
-      nb_output = self.fc.out_features
-      weight = copy.deepcopy(self.fc.weight.data)
-      bias = copy.deepcopy(self.fc.bias.data)
-      fc.weight.data[:nb_output, : self.feature_dim - self.out_dim] = weight
-      fc.bias.data[:nb_output] = bias
-      self.backbones[-1].load_state_dict(self.backbones[-2].state_dict())
-
+      try:
+        nb_output = self.fc.out_features
+        weight = copy.deepcopy(self.fc.weight.data)
+        fc.weight.data[:nb_output, : self.feature_dim - self.out_dim] = weight
+        self.backbones[-1].load_state_dict(
+          {key: self.backbones[-2].state_dict()[key] for key in self.backbones[-2].state_dict() if key in self.backbones[-1].state_dict()})
+        if self.fc.bias is not None:
+          bias = copy.deepcopy(self.fc.bias.data)
+          fc.bias.data[:nb_output] = bias
+      except:
+        nb_output = self.fc.module.out_features
+        weight = copy.deepcopy(self.fc.module.weight.data)
+        fc.weight.data[:nb_output] = weight
+        if self.fc.module.bias is not None:
+          bias = copy.deepcopy(self.fc.module.bias.data)
+          fc.bias.data[:nb_output] = bias
     self.oldfc = self.fc
     self.fc = fc
     new_task_size = nb_classes - sum(self.task_sizes)
@@ -592,7 +602,7 @@ class FOSTERNet(nn.Module):
     self.fe_fc = self.generate_fc(self.out_dim, nb_classes)
 
   def generate_fc(self, in_dim, out_dim):
-    fc = SimpleLinear(in_dim, out_dim)
+    fc = SimpleLinear(in_dim, out_dim, bias=self.args["bias"])
     return fc
 
   def copy(self):
@@ -600,10 +610,13 @@ class FOSTERNet(nn.Module):
 
   def copy_fc(self, fc):
     weight = copy.deepcopy(fc.weight.data)
-    bias = copy.deepcopy(fc.bias.data)
     n, m = weight.shape[0], weight.shape[1]
     self.fc.weight.data[:n, :m] = weight
-    self.fc.bias.data[:n] = bias
+    try:
+      bias = copy.deepcopy(fc.bias.data)
+      self.fc.bias.data[:n] = bias
+    except:
+      pass
 
   def freeze(self):
     for param in self.parameters():
