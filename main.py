@@ -135,6 +135,9 @@ def setup_parser():
 
   parser.add_argument('--fp130', action="store_true")
 
+  # recording
+  parser.add_argument('--rec_grads', action="store_true")
+
   return parser
 
 

@@ -574,7 +574,7 @@ class FOSTERNet(nn.Module):
     return out
 
   def update_fc(self, nb_classes):
-    self.backbones.append(get_backbone(self.backbone_type))
+    self.backbones.append(get_backbone(self.backbone_type, args=self.args))
     if self.out_dim is None:
       self.out_dim = self.backbones[-1].out_dim
     fc = self.generate_fc(self.feature_dim, nb_classes)

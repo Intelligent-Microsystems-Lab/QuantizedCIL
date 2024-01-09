@@ -518,24 +518,33 @@ class FLinearQ(torch.autograd.Function):
 
 
     global current_uname
-    fin_output = 0 * F.linear(x[:,0:quantBlockSize], w[:,0:quantBlockSize])
+    if quantBlockSize < x.shape[1]:
+      fin_output = 0 * F.linear(x[:,0:quantBlockSize], w[:,0:quantBlockSize])
 
-    for i in range(int(np.ceil( x.shape[1]/quantBlockSize ))):
-      output = F.linear(x[:,i*quantBlockSize:(i+1)*quantBlockSize], w[:,i*quantBlockSize:(i+1)*quantBlockSize])
+      for i in range(int(np.ceil( x.shape[1]/quantBlockSize ))):
+        try:
+          output = F.linear(x[:,i*quantBlockSize:(i+1)*quantBlockSize], w[:,i*quantBlockSize:(i+1)*quantBlockSize])
+        except:
+          import pdb; pdb.set_trace()
+        # requantize to acc BW (clamp to big values - no scale)
+        if quantAccFWD and quantAccBits < 16:
+          n = 2**quantAccBits / 2 - 1
+          output = torch.clamp(output, -n, n)
+
+        if quantUpdateScalePhase:
+          global scale_library
+          global current_uname
+          scale_library[current_uname] = (int(torch.sum(output == 0.))/np.prod(output.shape),
+                                          max(int(torch.sum(output == n))/np.prod(output.shape),
+                                              int(torch.sum(output == -n))/np.prod(output.shape)))
+          
+        fin_output += output
+    else:
+      fin_output = F.linear(x, w)
       # requantize to acc BW (clamp to big values - no scale)
       if quantAccFWD and quantAccBits < 16:
         n = 2**quantAccBits / 2 - 1
-        output = torch.clamp(output, -n, n)
-
-      if quantUpdateScalePhase:
-        global scale_library
-        global current_uname
-        scale_library[current_uname] = (int(torch.sum(output == 0.))/np.prod(output.shape),
-                                        max(int(torch.sum(output == n))/np.prod(output.shape),
-                                            int(torch.sum(output == -n))/np.prod(output.shape)))
-        
-
-      fin_output += output
+        fin_output = torch.clamp(fin_output, -n, n)
 
     return fin_output * sw * sx
 
@@ -589,7 +598,11 @@ class FLinearQ(torch.autograd.Function):
 
     grad_input = (grad_output_h1 @ w_h1) 
     grad_input_noq = grad_output @ w
-    grad_input_copy = copy.deepcopy(grad_input.detach())
+    
+    global global_args
+    if global_args["rec_grads"]:
+      grad_input_copy = grad_input.clone().detach()
+   
     if quantAccBWD and quantAccBits < 16:
       n = 2**quantAccBits / 2 - 1
       grad_input = torch.clamp(grad_input, -n, n)
@@ -597,7 +610,7 @@ class FLinearQ(torch.autograd.Function):
     # or kl div
     global batchnr
     global epochnr
-    if batchnr==0 and epochnr%50==0:
+    if batchnr==0 and epochnr%50==0 and global_args["rec_grads"]:
       global gradient_library
       global current_uname
       if grad_output_h1.shape[1] < grad_output_h1.shape[0]:
