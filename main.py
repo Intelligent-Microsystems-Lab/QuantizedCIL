@@ -11,6 +11,10 @@ def main():
   args = vars(args)  # Converting argparse Namespace to a dict.
   param.update(args)
   print(param)
+  if param["model_name"] == "foster":
+    import torch.multiprocessing
+    torch.multiprocessing.set_sharing_strategy('file_system')
+
   train(param)
 
 
