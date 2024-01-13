@@ -16,6 +16,7 @@ quantAccFWD = False
 
 epochnr = 0
 batchnr = 0
+global_args = None
 gradient_library = {}
 scale_library = {}
 scale_library_hist = []
@@ -277,6 +278,7 @@ class GradStochasticClippingQ(Function):
 
             global batchnr
             global epochnr
+            global global_args
             if batchnr==0 and epochnr%50==0 and global_args["rec_grads"]:
                 global gradient_library
                 

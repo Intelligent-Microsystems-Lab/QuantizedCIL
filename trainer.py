@@ -124,6 +124,7 @@ def _train(args):
   quant.quantHadOff = args["quantHadOff"]
   quant.quantRequantize = args["quantRequantize"]
   quant.global_args = args
+  LUQ.global_args = args
 
   if args['fp130']:
     quant.quantFP134_rep = '11111110'
