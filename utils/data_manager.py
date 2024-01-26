@@ -30,7 +30,9 @@ class DataManager(object):
     return len(self._class_order)
 
   def get_dataset(
-      self, indices, source, mode, appendent=None, ret_data=False, m_rate=None, no_trsf=False,
+      self, indices, source, mode, appendent=None, ret_data=False, m_rate=None,
+      no_trsf=False,
+      debug=False
   ):
     if source == "train":
       x, y = self._train_data, self._train_targets
@@ -55,6 +57,8 @@ class DataManager(object):
       raise ValueError("Unknown mode {}.".format(mode))
 
     data, targets = [], []
+    if debug:
+      import pdb; pdb.set_trace()
     for idx in indices:
       if m_rate is None:
         class_data, class_targets = self._select(

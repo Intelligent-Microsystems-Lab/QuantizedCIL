@@ -13,7 +13,7 @@ from torch.nn.parameter import Parameter
 from torch.autograd.function import Function
 from torch.autograd.function import InplaceFunction
 
-from backbones.linears import SimpleLinear
+from backbones.linears import SimpleLinear, SplitCosineLinear, CosineLinear, reduce_proxies
 
 from utils.data_manager import DummyDataset
 from torch.utils.data import DataLoader
@@ -187,6 +187,8 @@ def place_quant(m, lin_w, lin_b, c_path='',):
   for attr_str in dir(m):
     if attr_str[:1] != '_':
       target_attr = getattr(m, attr_str)
+      # if isinstance(target_attr, nn.Conv2d):
+      #   import pdb; pdb.set_trace()
       if isinstance(target_attr, nn.Conv2d):
         if not hasattr(target_attr, 'c1'):
           if quantMethod == 'luq_og' or quantMethod == 'luq_corrected':
@@ -210,15 +212,21 @@ def place_quant(m, lin_w, lin_b, c_path='',):
                            groups=target_attr.groups,
                            bias=hasattr(target_attr, 'bias'),
                            uname=c_path + '_' + attr_str,))
-      if isinstance(target_attr, nn.Linear) or isinstance(target_attr,
-                                                          SimpleLinear):
+      if isinstance(target_attr,
+                    nn.Linear) or isinstance(target_attr,
+                                             SimpleLinear) or isinstance(target_attr,
+                                                                         CosineLinear):
         if not hasattr(target_attr, 'c1'):
           if quantMethod == 'luq_og' or quantMethod == 'luq_corrected':
             if quantMethod == 'luq_corrected':
               LUQ.corrected_version = True
             tmp_meth = Linear_LUQ
           elif quantMethod == 'ours':
-            tmp_meth = Linear_Ours
+            #TODO fix cosine linear for LUQ ours and fp134
+            if isinstance(target_attr, CosineLinear) and False:
+              tmp_meth = CosineLinear_Ours
+            else:
+              tmp_meth = Linear_Ours
           elif quantMethod == 'fp134':
             tmp_meth = Linear_FP134
           else:
@@ -794,7 +802,7 @@ class Conv2d_Ours(nn.Conv2d):
         self.weight.data = torch.round(self.weight/(scale+1e-32))
 
   def forward(self, input):
-
+    
     if quantFWDWgt == 'sawb':
       raise Exception('not implemented')
       w_q = UniformQuantizeSawb.apply(
@@ -858,6 +866,103 @@ class Conv2d_Ours(nn.Conv2d):
       output += self.bias.view(1, -1, 1, 1)
 
     return output
+
+
+
+
+
+class CosineLinear_Ours(CosineLinear):
+
+  def __init__(self, uname, nb_proxy=1, to_reduce=False, sigma=True, *args,
+               **kwargs):
+    super(CosineLinear_Ours, self).__init__(nb_proxy=1, to_reduce=False,
+                                            sigma=True,*args, **kwargs)
+    init_properties(self, uname)
+
+    self.register_buffer('hadamard_out', torch.tensor(
+        make_hadamard(self.out_features), dtype=self.weight.dtype))
+    self.register_buffer('hadamard_bs', torch.tensor(
+        make_hadamard(quantBatchSize), dtype=self.weight.dtype))
+
+
+    if quantFWDWgt == 'mem':
+      scale_dyn_range = global_args["dyn_scale"]
+      with torch.no_grad():
+
+        mx = self.weight.abs().max() * scale_dyn_range
+        scale = mx / (2**(quantWgtStoreBits - 1) - 1)
+
+        mult_mx = 2**(quantWgtStoreBits - 1) - 1
+        mult_scale = mult_mx / (2**(quantBits - 1) - 1)
+
+        self.register_buffer('sw', scale * mult_scale)
+        self.weight.data = torch.round(self.weight/(scale+1e-32))
+
+  def forward(self, input):
+    self.weight = F.normalize(self.weight, p=2, dim=1)
+    if quantFWDWgt == 'sawb':
+      raise Exception('not implemented')
+      w_q = UniformQuantizeSawb.apply(
+          self.weight, self.c1, self.c2, self.QpW, self.QnW)
+    elif quantFWDWgt == 'int':
+      w_q, sw = dynamic_intQ_FWD.apply(self.weight)
+    elif quantFWDWgt == 'lsq':
+      raise Exception('not implemented')
+      w_q = lsq(self.weight, self.lsq_wgt, self.QpW, self.QnW)
+    elif quantFWDWgt == 'mem':
+      w_q = self.weight
+      sw = self.sw
+    elif quantFWDWgt == 'noq':
+      w_q = self.weight
+      sw = torch.tensor([1.0])
+    else:
+      raise Exception(
+          'FWD weight quantized method not implemented: ' + quantFWDWgt)
+
+    if torch.min(input) < 0:
+      self.QnA = -2 ** (self.abits - 1) + 1
+      self.QpA = 2 ** (self.wbits - 1) - 1
+
+    input = F.normalize(input, p=2, dim=1)
+    if quantFWDAct == 'sawb':
+      raise Exception('not implemented')
+      qinput = UniformQuantizeSawb.apply(
+          input, self.c1, self.c2, self.QpA, self.QnA)
+    elif quantFWDAct == 'int':
+      
+      qinput, sa = dynamic_intQ_FWD.apply(input)
+    elif quantFWDAct == 'lsq':
+      raise Exception('not implemented')
+      qinput = lsq(input, self.lsq_wgt, self.QpA, self.QnA)
+    elif quantFWDAct == 'noq':
+      qinput = input
+      sa = torch.tensor([1.0])
+    else:
+      raise Exception(
+          'FWD act quantized method not implemented: ' + quantFWDWgt)
+
+    # TODO: optimize speed of hadamard creation
+    if input.shape[0] != quantBatchSize:
+      h_bs = torch.tensor(make_hadamard(
+          input.shape[0]), dtype=self.weight.dtype).to(self.weight.device)
+    else:
+      h_bs = self.hadamard_bs
+
+    global current_uname
+    current_uname = self.uname
+
+    output = FLinearQ.apply(qinput, w_q, self.hadamard_out, h_bs, sa, sw) 
+    if self.bias is not None:
+      output += self.bias
+
+    if self.to_reduce:
+      # Reduce_proxy
+      output = reduce_proxies(output, self.nb_proxy)
+
+    if self.sigma is not None:
+      output = self.sigma * output
+
+    return {'logits': output}
 # import scipy
 # import numpy as np
 # import functools
