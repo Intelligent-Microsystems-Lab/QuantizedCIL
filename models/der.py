@@ -10,6 +10,8 @@ from models.base import BaseLearner
 from utils.inc_net import DERNet, IncrementalNet
 from utils.toolkit import count_parameters, target2onehot, tensor2numpy
 
+import lptorch as lp
+
 import quant 
 
 EPSILON = 1e-8

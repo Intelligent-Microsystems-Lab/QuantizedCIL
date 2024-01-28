@@ -20,8 +20,8 @@ from torch.utils.data import DataLoader
 
 from luq import LUQ
 from luq.LUQ import Conv2d_LUQ, Linear_LUQ
-# import lptorch as lp
-# qnn = lp.nn
+import lptorch as lp
+qnn = lp.nn
 
 from squant_function import SQuant_func
 
@@ -181,8 +181,8 @@ def Linear_FP134(in_features, out_features, bias, uname):
   return qnn.QLayer(nn.Linear(in_features = in_features, out_features = out_features, bias = bias), last=True, ret_dict = True)
 
 def place_quant(m, lin_w, lin_b, c_path='',):
-  # if isinstance(m, qnn.QLayer):
-  #   return
+  if isinstance(m, qnn.QLayer):
+    return
 
   for attr_str in dir(m):
     if attr_str[:1] != '_':
