@@ -19,7 +19,7 @@ from datetime import datetime
 import quant
 from luq import LUQ
 
-# import lptorch as lp
+import lptorch as lp
 
 track_layer_list = ['_convnet_conv_1_3x3', '_convnet_stage_1_2_conv_b',
                     '_convnet_stage_2_4_conv_a', '_convnet_stage_3_3_conv_a', '_fc']
@@ -320,7 +320,7 @@ class iCaRL(BaseLearner):
         gen_cnt += 1
       train_acc = np.around(tensor2numpy(correct) * 100 / total, decimals=2)
 
-      if epoch % 10 == 0:
+      if epoch % 10 == 0 and self.args["rec_weights"] is not None:
         quant.weight_recording[epoch] = copy.deepcopy(self._network.state_dict())
 
       if epoch % 5 == 0:

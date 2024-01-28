@@ -436,7 +436,7 @@ def update_scale(m, c_path='',):
           
       if isinstance(target_attr, Linear_Ours): # or isinstance(target_attr,
         if hasattr(target_attr, 'c1'):
-          c_name = c_path + '_' + attr_str
+          c_name = c_path + '_' + attr_strpdb
           if scale_library[c_path + '_' + attr_str][1] > quantUpdateHighThr:
             with torch.no_grad():
               target_attr.weight /= 2
