@@ -180,9 +180,40 @@ def Linear_FP134(in_features, out_features, bias, uname):
   set_lptorch_quant()
   return qnn.QLayer(nn.Linear(in_features = in_features, out_features = out_features, bias = bias), last=True, ret_dict = True)
 
-def place_quant(m, lin_w, lin_b, c_path='',):
+def place_quant(m, lin_w, lin_b, c_path='',is_fc_layer=False,debug=False):
+  if debug == True:
+    import pdb; pdb.set_trace()
+
+  if quantMethod == 'noq':
+    if is_fc_layer:
+      return m
+    else:
+      return
+
   if isinstance(m, qnn.QLayer):
     return
+
+  if is_fc_layer:
+    if quantMethod == 'luq_og' or quantMethod == 'luq_corrected':
+      if quantMethod == 'luq_corrected':
+        LUQ.corrected_version = True
+      tmp_meth = Linear_LUQ
+    elif quantMethod == 'ours':
+      #TODO fix cosine linear for LUQ ours and fp134
+      if isinstance(target_attr, CosineLinear) and False:
+        tmp_meth = CosineLinear_Ours
+      else:
+        tmp_meth = Linear_Ours
+    elif quantMethod == 'fp134':
+      tmp_meth = Linear_FP134
+    else:
+      raise Exception('Unknown quant method: ' + quantMethod)
+
+    return tmp_meth(in_features=m.in_features,
+                                        out_features=m.out_features,
+                                        bias=getattr(
+                                            m, 'bias') is not None,
+                                        uname=c_path + '_fc',)
 
   for attr_str in dir(m):
     if attr_str[:1] != '_':

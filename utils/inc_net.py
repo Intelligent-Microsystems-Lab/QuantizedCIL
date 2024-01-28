@@ -39,6 +39,7 @@ from backbones.memo_resnet import get_resnet26_imagenet as memo_resnet26_imagene
 from backbones.memo_resnet import get_resnet34_imagenet as memo_resnet34_imagenet
 from backbones.memo_resnet import get_resnet50_imagenet as memo_resnet50_imagenet
 
+import quant
 
 def get_backbone(backbone_type, pretrained=False, args=None):
   name = backbone_type.lower()
@@ -443,9 +444,16 @@ class DERNet(nn.Module):
   def update_fc(self, nb_classes):
     if len(self.backbones) == 0:
       self.backbones.append(get_backbone(self.backbone_type, args=self.args))
+      lin_w, lin_b = quant.save_lin_params(self.backbones[-1])
+      quant.place_quant(self.backbones[-1], lin_w, lin_b)
+      # import pdb; pdb.set_trace()
     else:
       self.backbones.append(get_backbone(self.backbone_type, args=self.args))
+      lin_w, lin_b = quant.save_lin_params(self.backbones[-1])
+      quant.place_quant(self.backbones[-1], lin_w, lin_b)
+
       self.backbones[-1].load_state_dict({key: self.backbones[-2].state_dict()[key] for key in self.backbones[-2].state_dict() if key in self.backbones[-1].state_dict()})
+
 
     if self.out_dim is None:
       self.out_dim = self.backbones[-1].out_dim
@@ -461,7 +469,8 @@ class DERNet(nn.Module):
       except:
         nb_output = self.fc.module.out_features
         weight = copy.deepcopy(self.fc.module.weight.data)
-        fc.weight.data[:nb_output] = weight
+        self.fc.module.weight.data[:nb_output, : self.feature_dim - self.out_dim] = weight
+        # fc.weight.data[:nb_output] = weight
 
         if self.fc.module.bias is not None:
           bias = copy.deepcopy(self.fc.module.bias.data)
@@ -494,14 +503,20 @@ class DERNet(nn.Module):
     self.backbones.eval()
 
   def weight_align(self, increment):
-    weights = self.fc.weight.data
+    try:
+      weights = self.fc.weight.data
+    except:
+      weights = self.fc.module.weight.data
     newnorm = torch.norm(weights[-increment:, :], p=2, dim=1)
     oldnorm = torch.norm(weights[:-increment, :], p=2, dim=1)
     meannew = torch.mean(newnorm)
     meanold = torch.mean(oldnorm)
     gamma = meanold / meannew
     print("alignweights,gamma=", gamma)
-    self.fc.weight.data[-increment:, :] *= gamma
+    try:
+      self.fc.weight.data[-increment:, :] *= gamma
+    except:
+      self.fc.module.weight.data[-increment:, :] *= gamma
 
   def load_checkpoint(self, args):
     checkpoint_name = f"checkpoints/finetune_{args['csv_name']}_0.pkl"
@@ -727,6 +742,8 @@ class AdaptiveNet(nn.Module):
   def update_fc(self, nb_classes):
     _, _new_extractor = get_backbone(self.backbone_type, self.pretrained,
                                      self.args)
+    lin_w, lin_b = quant.save_lin_params(_new_extractor)
+    quant.place_quant(_new_extractor, lin_w, lin_b)
     if len(self.AdaptiveExtractors) == 0:
       self.AdaptiveExtractors.append(_new_extractor)
     else:
@@ -742,7 +759,10 @@ class AdaptiveNet(nn.Module):
         self.out_dim = self.AdaptiveExtractors[-1].feature_dim        
       except:
         self.out_dim = self.AdaptiveExtractors[-1].out_dim
-    fc = self.generate_fc(self.feature_dim, nb_classes)             
+    fc = self.generate_fc(self.feature_dim, nb_classes) 
+    # lin_w, lin_b = quant.save_lin_params(fc)
+    fc = quant.place_quant(fc, None, None, is_fc_layer = True)
+    # import pdb; pdb.set_trace()
     if self.fc is not None:
       try:
         nb_output = self.fc.out_features
@@ -755,11 +775,11 @@ class AdaptiveNet(nn.Module):
       except:
         nb_output = self.fc.module.out_features
         weight = copy.deepcopy(self.fc.module.weight.data)
-        fc.weight.data[:nb_output,:self.feature_dim-self.out_dim] = weight
+        fc.module.weight.data[:nb_output,:self.feature_dim-self.out_dim] = weight
 
         if self.fc.module.bias is not None:
           bias = copy.deepcopy(self.fc.module.bias.data)
-          fc.bias.data[:nb_output] = bias
+          fc.module.bias.data[:nb_output] = bias
 
     del self.fc
     self.fc = fc
@@ -776,15 +796,20 @@ class AdaptiveNet(nn.Module):
     return copy.deepcopy(self)
 
   def weight_align(self, increment):
-    weights = self.fc.weight.data
+    try:
+      weights = self.fc.weight.data
+    except:
+      weights = self.fc.module.weight.data
     newnorm = (torch.norm(weights[-increment:, :], p=2, dim=1))
     oldnorm = (torch.norm(weights[:-increment, :], p=2, dim=1))
     meannew = torch.mean(newnorm)
     meanold = torch.mean(oldnorm)
     gamma = meanold / meannew
     print('alignweights,gamma=', gamma)
-    self.fc.weight.data[-increment:, :] *= gamma
-
+    try:
+      self.fc.weight.data[-increment:, :] *= gamma
+    except:
+      self.fc.module.weight.data[-increment:, :] *= gamma
   def load_checkpoint(self, args):
     if args["init_cls"] == 50:
       pkl_name = "{}_{}_{}_B{}_Inc{}".format( 
