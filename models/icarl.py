@@ -320,6 +320,9 @@ class iCaRL(BaseLearner):
         gen_cnt += 1
       train_acc = np.around(tensor2numpy(correct) * 100 / total, decimals=2)
 
+      if epoch % 10 == 0:
+        quant.weight_recording[epoch] = copy.deepcopy(self._network.state_dict())
+
       if epoch % 5 == 0:
         test_acc = self._compute_accuracy(self._network, test_loader)
         self._network.train()

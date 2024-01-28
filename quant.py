@@ -77,6 +77,7 @@ gradient_library = {}
 scale_library = {}
 scale_library_hist = []
 quant_range_use_perc = {}
+weight_recording = {}
 
 
 class QuantMomentumOptimizer(torch.optim.Optimizer):

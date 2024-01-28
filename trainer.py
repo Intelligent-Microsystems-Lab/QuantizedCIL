@@ -183,6 +183,15 @@ def _train(args):
   cost_time = end_time - start_time
   save_time(args, cost_time)
   save_results(args, cnn_curve, nme_curve, no_nme)
+
+  if args["rec_weights"]:
+    try:
+      np.save(f"logs/{args['dataset']}/{args['model_name']}/weights/{args['model_type']}_{args['quantMethod']}_accbits_{args['quantAccBits']}_{args['seed']}.npy",
+                quant.weight_recording)
+    except:
+      os.makedirs(f"logs/{args['dataset']}/{args['model_name']}/weights/", exist_ok=True)
+      np.save(f"logs/{args['dataset']}/{args['model_name']}/weights/{args['model_type']}_{args['quantMethod']}_accbits_{args['quantAccBits']}_{args['seed']}.npy",
+                quant.weight_recording)
   if args["rec_grads"]:
     try:
       if args['quantMethod'] == "ours":
