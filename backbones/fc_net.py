@@ -77,6 +77,10 @@ class FCNet(nn.Module):
   @property
   def last_layer(self):
     return self.net[-1]
+  
+  @property
+  def feature_dim(self):
+    return self.out_dim
 
 
 def get_memo_fcnet(in_dim, hid_dim, out_dim, nr_hid_layers, act_fun="relu",

@@ -58,7 +58,9 @@ def get_backbone(backbone_type, pretrained=False, args=None):
     return cosine_resnet34(pretrained=pretrained)
   elif name == "cosine_resnet50":
     return cosine_resnet50(pretrained=pretrained)
-
+  elif name == 'cosine_fcnet':
+    return FCNet(args["in_dim"], args["fc_hid_dim"], args["in_dim"],
+                 args["fc_nr_hid"], "relu", args["bias"], args["half_dims"])
   # MEMO benchmark backbone
   elif name == 'memo_resnet18':
     _basenet, _adaptive_net = get_memo_resnet18()
@@ -124,7 +126,6 @@ def get_backbone(backbone_type, pretrained=False, args=None):
     g_blcoks, s_blocks = memo_resnet50_imagenet()
     return g_blcoks, s_blocks
   elif name == 'fcnet' and args is not None:
-
     return FCNet(args["in_dim"], args["fc_hid_dim"], args["in_dim"],
                  args["fc_nr_hid"], "relu", args["bias"], args["half_dims"])
 
@@ -513,19 +514,24 @@ class DERNet(nn.Module):
 
 
 class SimpleCosineIncrementalNet(BaseNet):
-  def __init__(self, backbone_type, pretrained):
-    super().__init__(backbone_type, pretrained)
+  def __init__(self, backbone_type, pretrained, args=None):
+    super().__init__(backbone_type, pretrained, args)
 
   def update_fc(self, nb_classes, nextperiod_initialization):
     fc = self.generate_fc(self.feature_dim, nb_classes).cuda()
     if self.fc is not None:
-      nb_output = self.fc.out_features
-      weight = copy.deepcopy(self.fc.weight.data)
-      fc.sigma.data = self.fc.sigma.data
-      if nextperiod_initialization is not None:
-
-        weight = torch.cat([weight, nextperiod_initialization])
-      fc.weight = nn.Parameter(weight)
+      try:
+        nb_output = self.fc.out_features
+        weight = copy.deepcopy(self.fc.weight.data)
+        fc.sigma.data = self.fc.sigma.data
+        if nextperiod_initialization is not None:
+          weight = torch.cat([weight, nextperiod_initialization])
+        fc.weight = nn.Parameter(weight)
+      except:
+        raise
+        nb_output = self.fc.module.out_features
+        weight = copy.deepcopy(self.fc.module.weight.data)
+        fc.sigma.data = weight
     del self.fc
     self.fc = fc
 
