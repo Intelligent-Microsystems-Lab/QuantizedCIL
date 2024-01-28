@@ -321,7 +321,9 @@ class iCaRL(BaseLearner):
       train_acc = np.around(tensor2numpy(correct) * 100 / total, decimals=2)
 
       if epoch % 10 == 0 and self.args["rec_weights"] is not None:
-        quant.weight_recording[epoch] = copy.deepcopy(self._network.state_dict())
+        if self._cur_task not in quant.weight_recording:
+          quant.weight_recording[self._cur_task] = {}
+        quant.weight_recording[self._cur_task][epoch] = copy.deepcopy(self._network.state_dict())
 
       if epoch % 5 == 0:
         test_acc = self._compute_accuracy(self._network, test_loader)
