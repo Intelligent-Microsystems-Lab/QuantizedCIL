@@ -10,6 +10,9 @@
 import matplotlib as mpl
 import matplotlib.font_manager as fm
 
+import torch
+import torch.nn.functional as F
+
 import pickle
 # import spiking_learning as sl
 # import optax
@@ -21,7 +24,41 @@ import matplotlib.pyplot as plt
 import os
 import seaborn as sb
 # os.environ['CUDA_VISIBLE_DEVICES'] = '1'
+from utils.data_manager import DataManager
+from torch.utils.data import DataLoader
 
+import torch.nn as nn
+args_in_dim = 405
+task = 0
+
+
+data_manager = DataManager(
+      'dsads',
+      True,
+      42,
+      2,
+      2,
+  )
+
+class Net(nn.Module):
+  def __init__(self):
+    super(Net, self).__init__()
+    self.fc1 = nn.Linear(405, 405, bias = False)
+    self.fc2 = nn.Linear(405, 405, bias = False)
+    self.fc3 = nn.Linear(405, 11, bias = False)
+
+  def forward(self, x):
+      
+    x = self.fc1(x)
+    x = F.relu(x)
+    x = self.fc2(x)
+    x = F.relu(x)
+    x = self.fc3(x)
+    # output = F.softmax(x, dim=1)
+
+    return x
+
+# model = factory.get_model('FC', args)
 
 # output_size = 10
 # nlayers = 3
@@ -113,6 +150,7 @@ def load_params(file, task=0, step=0):
 
   all_params = []
   for k,v in data_s[task][step].items():
+    # print(k)
     all_params.append(np.array(v.flatten().cpu().numpy()))
 
   return np.concatenate(all_params)
@@ -291,6 +329,44 @@ y = np.linspace(
     100,
 )
 
+
+
+model = Net().cuda()
+
+def load_w(model, params):
+  with torch.no_grad():
+    model.fc1.weight = nn.Parameter(torch.tensor(np.reshape(params[:405*405], (405,405))).cuda())
+    model.fc2.weight = nn.Parameter(torch.tensor(np.reshape(params[405*405:405*405*2], (405,405))).cuda())
+    model.fc3.weight = nn.Parameter(torch.tensor(np.reshape(params[405*405*2:(405*405*2)+(405*11)], (11,405))).cuda())
+
+  return model
+
+
+
+
+model = load_w(model, params_end)
+
+
+test_dataset = data_manager.get_dataset(
+        np.arange(0, 11), source="test", mode="test"
+    )
+test_loader = DataLoader(
+    test_dataset, batch_size=128, shuffle=False,
+    num_workers=4
+)
+
+model.eval()
+correct, total = 0, 0
+for i, (_, inputs, targets) in enumerate(test_loader):
+  inputs = inputs.cuda()
+  with torch.no_grad():
+    outputs = model(inputs)# ["logits"]
+  predicts = torch.max(outputs, dim=1)[1]
+  correct += (predicts.cpu() == targets).sum()
+  total += len(targets)
+
+
+import pdb; pdb.set_trace()
 
 xv, yv, zv = get_surface(x, y, xdirection, ydirection, params_end) # params_end[model_indicator])
 import pdb; pdb.set_trace() # martin hier....
