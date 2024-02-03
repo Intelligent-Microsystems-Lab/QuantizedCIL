@@ -27,15 +27,19 @@ import seaborn as sb
 from utils.data_manager import DataManager
 from torch.utils.data import DataLoader
 
+from torch.nn import functional as F
+
 import torch.nn as nn
 args_in_dim = 405
 task = 0
+
+resolution = 10
 
 
 data_manager = DataManager(
       'dsads',
       True,
-      42,
+      1994,
       2,
       2,
   )
@@ -54,6 +58,7 @@ class Net(nn.Module):
     x = self.fc2(x)
     x = F.relu(x)
     x = self.fc3(x)
+    x = F.relu(x)
     # output = F.softmax(x, dim=1)
 
     return x
@@ -97,12 +102,12 @@ class Net(nn.Module):
 # seed = 0
 # key = jax.random.PRNGKey(seed)
 # key2 = jax.random.split(key,num=1)[0]
-# colors = ['#e41a1c','#377eb8','#4daf4a','#984ea3','#ff7f00']
-# marker_colors = [sb.set_hls_values('#e41a1c',l=0.2),
-#                  sb.set_hls_values('#377eb8',l=0.2),
-#                  sb.desaturate('#4daf4a',0.5),
-#                  sb.desaturate('#984ea3',0.5),
-#                  sb.desaturate('#ff7f00',0.5)]
+colors = ['#e41a1c','#377eb8','#4daf4a','#984ea3','#ff7f00']
+marker_colors = [sb.set_hls_values('#e41a1c',l=0.2),
+                 sb.set_hls_values('#377eb8',l=0.2),
+                 sb.desaturate('#4daf4a',0.5),
+                 sb.desaturate('#984ea3',0.5),
+                 sb.desaturate('#ff7f00',0.5)]
 
 # model_indicator = 4
 
@@ -155,16 +160,19 @@ def load_params(file, task=0, step=0):
 
   return np.concatenate(all_params)
 
-def npvec_to_tensorlist(pc, params):
-  tree_val, tree_struct = jax.tree_util.tree_flatten(params)
-  val_list = []
-  counter = 0
-  for i in [x.shape for x in tree_val]:
-    increase = np.prod(i)
-    val_list.append(pc[counter: int(counter + increase)].reshape(i))
-    counter += increase
+# def npvec_to_tensorlist(pc, params):
+#   tree_val, tree_struct = jax.tree_util.tree_flatten(params)
+#   val_list = []
+#   counter = 0
+#   for i in [x.shape for x in tree_val]:
+#     increase = np.prod(i)
+#     val_list.append(pc[counter: int(counter + increase)].reshape(i))
+#     counter += increase
 
-  return jax.tree_util.tree_unflatten(tree_struct, val_list)
+#   return jax.tree_util.tree_unflatten(tree_struct, val_list)
+
+# def npvec_to_tensorlist(pc, params):
+
 
 
 def project1d(w, d):
@@ -197,37 +205,81 @@ def project2d(d, dx, dy, proj_method):
 #   return c, loss
 
 
-def get_loss(params, gen_key):
-  data, logits = gen_data(seed2=gen_key)
+test_dataset = data_manager.get_dataset(
+      np.arange(0, 11), source="test", mode="test"
+  )
+test_loader = DataLoader(
+    test_dataset, batch_size=128, shuffle=False,
+    num_workers=4
+)
+
+def get_loss(model):
+
+  model.eval()
+  correct, total, loss, cnt = 0, 0, [], []
+  for i, (_, inputs, targets) in enumerate(test_loader):
+    inputs = inputs.cuda()
+    targets = targets.cuda()
+    with torch.no_grad():
+      outputs = model(inputs)# ["logits"]
+    predicts = torch.max(outputs, dim=1)[1]
+    correct += (predicts == targets).sum()
+    total += len(targets)
+
+    loss.append(F.cross_entropy(outputs, targets))
+    cnt.append(outputs.shape[0])
+
+  return torch.tensor(loss) @ torch.tensor(cnt, dtype = torch.float) / np.sum(cnt)
 
 
-  p_loss = Partial(loss_fn, params)
-  c, loss = jax.lax.scan(
-      p_loss, carry, (data[:, :batch_sz], logits[:, :batch_sz]))
-  return jnp.mean(loss)
+  # data, logits = gen_data(seed2=gen_key)
+
+  # p_loss = Partial(loss_fn, params)
+  # c, loss = jax.lax.scan(
+  #     p_loss, carry, (data[:, :batch_sz], logits[:, :batch_sz]))
+  # return jnp.mean(loss)
 
 
-def get_surface(x, y, xdirection, ydirection, variables):
+def get_surface(model, x, y, xdirection, ydirection, variables):
 
-  xv, yv = jnp.meshgrid(x, y)
+  xv, yv = np.meshgrid(x, y)
 
-  def surface_parallel(ix, iy):
-    interpolate_vars = jax.tree_util.tree_map(
-        lambda w, x, y: w + x * ix + y * iy,
-        variables,
-        xdirection,
-        ydirection,
-    )
-    return get_loss(interpolate_vars, key2)
+  # def surface_parallel(ix, iy):
 
 
-  zv_list = []
-  for i in range(int(xv.flatten().shape[0] / 100)):
-    zv = torch.vmap(surface_parallel)(
-        jnp.array(xv.flatten())[(i * 100): (i + 1) * 100],
-        jnp.array(yv.flatten())[(i * 100): (i + 1) * 100],
-    )
-    zv_list.append(zv)
+  #   interpolate_vars = jax.tree_util.tree_map(
+  #       lambda w, x, y: w + x * ix + y * iy,
+  #       variables,
+  #       xdirection,
+  #       ydirection,
+  #   )
+
+  #   model = load_w(model, params_end)
+
+  #   return get_loss(interpolate_vars, key2)
+
+
+  zv_list = np.ones((resolution,resolution)) * -1
+  for i in range(resolution):
+    for j in range(resolution):
+      # zv = torch.vmap(surface_parallel)(
+      #     jnp.array(xv.flatten())[(i * 100): (i + 1) * 100],
+      #     jnp.array(yv.flatten())[(i * 100): (i + 1) * 100],
+      # )
+
+      # import pdb; pdb.set_trace()
+      # interpolate_vars = jax.tree_util.tree_map(
+      #     lambda w, x, y: w + x * ix + y * iy,
+      #     variables,
+      #     xdirection,
+      #     ydirection,
+      # )
+
+      model = load_w(model, variables + xv[i,j] * xdirection + yv[i,j] * ydirection)# interpolate_vars)
+      zv_list[i,j] = get_loss(model)
+      print('.', end='')
+
+      # zv_list.append(get_loss(model))
 
   return xv, yv, np.stack(zv_list).flatten().reshape(xv.shape)
 
@@ -260,8 +312,8 @@ pc2 = np.array(pca.components_[1])
 
 angle = np.dot(pc1, pc2) / (np.linalg.norm(pc1) * np.linalg.norm(pc2))
 
-# xdirection = npvec_to_tensorlist(pc1, params_end)
-# ydirection = npvec_to_tensorlist(pc2, params_end)
+xdirection = pc1 # npvec_to_tensorlist(pc1, params_end)
+ydirection = pc2 # npvec_to_tensorlist(pc2, params_end)
 
 ratio_x = pca.explained_variance_ratio_[0]
 ratio_y = pca.explained_variance_ratio_[1]
@@ -321,12 +373,12 @@ buffer_x = x_abs_max * 0.05
 x = np.linspace(
     (-1*x_abs_max) - buffer_x,
     x_abs_max + buffer_x,
-    100,
+    resolution,
 )
 y = np.linspace(
     (-1*y_abs_max) - buffer_y,
     y_abs_max + buffer_y,
-    100,
+    resolution,
 )
 
 
@@ -346,30 +398,9 @@ def load_w(model, params):
 
 model = load_w(model, params_end)
 
+xv, yv, zv = get_surface(model, x, y, xdirection, ydirection, params_end) # params_end[model_indicator])
 
-test_dataset = data_manager.get_dataset(
-        np.arange(0, 11), source="test", mode="test"
-    )
-test_loader = DataLoader(
-    test_dataset, batch_size=128, shuffle=False,
-    num_workers=4
-)
-
-model.eval()
-correct, total = 0, 0
-for i, (_, inputs, targets) in enumerate(test_loader):
-  inputs = inputs.cuda()
-  with torch.no_grad():
-    outputs = model(inputs)# ["logits"]
-  predicts = torch.max(outputs, dim=1)[1]
-  correct += (predicts.cpu() == targets).sum()
-  total += len(targets)
-
-
-import pdb; pdb.set_trace()
-
-xv, yv, zv = get_surface(x, y, xdirection, ydirection, params_end) # params_end[model_indicator])
-import pdb; pdb.set_trace() # martin hier....
+# import pdb; pdb.set_trace() # martin hier....
 font_size = 23
 gen_lw = 8
 
@@ -385,10 +416,10 @@ def fmt(x):
 
 
 #CS = ax.contourf(xv, yv, zv, 100)
-CS = ax.contour(xv, yv, zv, 100)
+CS = ax.contour(xv, yv, zv, resolution)
 ax.clabel(CS, CS.levels, inline=True, fmt=fmt, fontsize=10)
 
-for j in range(5):
+for j in range(1):
   ax.plot(
       xcoord[j],
       ycoord[j],
@@ -412,5 +443,5 @@ ax.set_ylabel(
 )
 
 plt.tight_layout()
-plt.savefig("plots/randman_ll_rate_offline_{}_{}_0".format(nlayers,layer_name)+".svg", dpi=300, bbox_inches="tight")
+plt.savefig("figures/ll_test.svg", dpi=300, bbox_inches="tight")
 plt.close()
