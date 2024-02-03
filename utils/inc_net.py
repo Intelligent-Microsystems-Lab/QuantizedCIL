@@ -452,7 +452,9 @@ class DERNet(nn.Module):
       lin_w, lin_b = quant.save_lin_params(self.backbones[-1])
       quant.place_quant(self.backbones[-1], lin_w, lin_b)
 
-      self.backbones[-1].load_state_dict({key: self.backbones[-2].state_dict()[key] for key in self.backbones[-2].state_dict() if key in self.backbones[-1].state_dict()})
+      # test = [self.backbones[-1].state_dict()[key].shape for key in self.backbones[-1].state_dict()]
+      # import pdb; pdb.set_trace()
+      self.backbones[-1].load_state_dict({key: self.backbones[-2].state_dict()[key] for key in self.backbones[-2].state_dict() if (key in self.backbones[-1].state_dict() and  'hadamard' not in key)}, strict = False)
 
 
     if self.out_dim is None:

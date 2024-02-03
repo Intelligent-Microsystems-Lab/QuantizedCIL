@@ -482,10 +482,7 @@ def dynamic_stoch(x, scale=1):
   xq_ord = torch.floor(x.abs())
 
   qe = x.abs() - xq_ord
-  try:
-    flip = torch.bernoulli(qe)
-  except:
-    import pdb; pdb.set_trace()
+  flip = torch.bernoulli(qe)
   xq = xq_ord + flip
 
   xq = torch.reshape(sign * xq, dim)

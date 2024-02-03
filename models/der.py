@@ -77,6 +77,7 @@ class DER(BaseLearner):
             mode="train",
             appendent=self._get_memory(),
         )
+        import pdb; pdb.set_trace()
         self.train_loader = DataLoader(
             train_dataset, batch_size=self.args['batch_size'], shuffle=True,
             num_workers=self.args['num_workers']
