@@ -77,7 +77,7 @@ marker_colors = [sb.set_hls_values('#e41a1c',l=0.2),
 def load_params(file='def', task=0, step=0):
 
   if file == 'def':
-    data_s = np.load('logs/dsads/icarl/weights/fcnet_noq_accbits_8_1994.npy', allow_pickle=True)      
+    data_s = np.load('logs/dsads/icarl/weights/fcnet_ours_accbits_8_1994.npy', allow_pickle=True)      
   else:
     data_s = np.load(file, allow_pickle=True)  
   data_s = np.reshape(data_s,(-1))[0]
@@ -198,11 +198,8 @@ for j in range(3):
   ycoord[j] = []
   for i in [0,10,20,30,40,50,60,70,80,90]:
 
-    try:
-      tmp, dummy_keys  = load_params(model_files[j], task_to_display, i)
-      diff_tmp = tmp - params_end
-    except:
-      import pdb; pdb.set_trace()
+    tmp, dummy_keys  = load_params(model_files[j], task_to_display, i)
+    diff_tmp = tmp - params_end
 
     tmp_x, tmp_y = project2d(diff_tmp, dx, dy, 'cos')
     xcoord[j].append(tmp_x)
@@ -212,8 +209,6 @@ for j in range(3):
       x_abs_max = abs(tmp_x)
     if np.abs(tmp_y) > y_abs_max:
       y_abs_max = abs(tmp_y)
-
-
 
 buffer_y = y_abs_max * 0.05
 buffer_x = x_abs_max * 0.05
@@ -248,7 +243,7 @@ model = load_w(model, params_end)
 
 xv, yv, zv = get_surface(model, x, y, xdirection, ydirection, params_end)
 
-
+zv = np.log(zv)
 
 font_size = 23
 gen_lw = 8
