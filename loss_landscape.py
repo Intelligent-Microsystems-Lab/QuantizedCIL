@@ -77,7 +77,7 @@ marker_colors = [sb.set_hls_values('#e41a1c',l=0.2),
 def load_params(file='def', task=0, step=0):
 
   if file == 'def':
-    data_s = np.load('logs/dsads/icarl/weights/fcnet_ours_accbits_8_1994.npy', allow_pickle=True)      
+    data_s = np.load('logs/dsads/icarl/weights/fcnet_luq_corrected_accbits_8_1994.npy', allow_pickle=True)      
   else:
     data_s = np.load(file, allow_pickle=True)  
   data_s = np.reshape(data_s,(-1))[0]
