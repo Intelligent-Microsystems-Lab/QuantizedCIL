@@ -201,10 +201,10 @@ def place_quant(m, lin_w, lin_b, c_path='',is_fc_layer=False,debug=False):
       tmp_meth = Linear_LUQ
     elif quantMethod == 'ours':
       #TODO fix cosine linear for LUQ ours and fp134
-      if isinstance(target_attr, CosineLinear) and False:
-        tmp_meth = CosineLinear_Ours
-      else:
-        tmp_meth = Linear_Ours
+      # if isinstance(target_attr, CosineLinear) and False:
+      #   tmp_meth = CosineLinear_Ours
+      # else:
+      tmp_meth = Linear_Ours
     elif quantMethod == 'fp134':
       tmp_meth = Linear_FP134
     else:
