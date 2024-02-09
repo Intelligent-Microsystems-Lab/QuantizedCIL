@@ -13,6 +13,13 @@ from utils.toolkit import target2onehot, tensor2numpy
 import ot
 import quant
 
+try:
+  import lptorch as lp
+  qnn = lp.nn
+except:
+  # makes code executable without lptorch compiled
+  pass
+
 EPSILON = 1e-8
 
 class COIL(BaseLearner):

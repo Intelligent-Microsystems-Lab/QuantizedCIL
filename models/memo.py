@@ -11,7 +11,12 @@ from models.base import BaseLearner
 from utils.inc_net import AdaptiveNet
 from utils.toolkit import count_parameters, target2onehot, tensor2numpy
 
-import lptorch as lp
+try:
+  import lptorch as lp
+  qnn = lp.nn
+except:
+  # makes code executable without lptorch compiled
+  pass
 
 import quant
 

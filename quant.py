@@ -20,8 +20,13 @@ from torch.utils.data import DataLoader
 
 from luq import LUQ
 from luq.LUQ import Conv2d_LUQ, Linear_LUQ
-import lptorch as lp
-qnn = lp.nn
+
+try:
+  import lptorch as lp
+  qnn = lp.nn
+except:
+  # makes code executable without lptorch compiled
+  pass
 
 from squant_function import SQuant_func
 
@@ -191,8 +196,12 @@ def place_quant(m, lin_w, lin_b, c_path='',is_fc_layer=False,debug=False):
     else:
       return
 
-  if isinstance(m, qnn.QLayer):
-    return
+  try:
+    if isinstance(m, qnn.QLayer):
+      return
+  except:
+    # makes code executable without lptorch compiled
+    pass
 
   if is_fc_layer:
     if quantMethod == 'luq_og' or quantMethod == 'luq_corrected':
