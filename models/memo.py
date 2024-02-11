@@ -127,23 +127,46 @@ class MEMO(BaseLearner):
     def _train(self, train_loader, test_loader):
         self._network.to(self._device)
         if self._cur_task==0:
-            optimizer = optim.SGD(
-                filter(lambda p: p.requires_grad, self._network.parameters()),
-                momentum=0.9,
-                lr=self.args["init_lr"],
-                weight_decay=self.args["init_weight_decay"]
-            )
-            if self.args['scheduler'] == 'steplr':
+            if 'fp13' in self.args["quantMethod"]:
+                optimizer = lp.optim.SGD(
+                    self._network.parameters(),
+                    momentum=0.9,
+                    lr=self.args['init_lr'],
+                    weight_decay=self.args['init_weight_decay'],
+                    weight_quantize=False
+                )
                 scheduler = optim.lr_scheduler.MultiStepLR(
-                    optimizer=optimizer, 
-                    milestones=self.args['init_milestones'], 
+                    optimizer=optimizer, milestones=self.args['init_milestones'],
                     gamma=self.args['init_lr_decay']
                 )
-            elif self.args['scheduler'] == 'cosine':
-                scheduler = optim.lr_scheduler.CosineAnnealingLR(
-                    optimizer=optimizer,
-                    T_max=self.args['init_epoch']
-                ) 
+            elif self.args["optimizer"] == "sgd":
+                optimizer = optim.SGD(
+                    filter(lambda p: p.requires_grad, self._network.parameters()),
+                    momentum=0.9,
+                    lr=self.args["init_lr"],
+                    weight_decay=self.args["init_weight_decay"]
+                )
+                if self.args['scheduler'] == 'steplr':
+                    scheduler = optim.lr_scheduler.MultiStepLR(
+                        optimizer=optimizer, 
+                        milestones=self.args['init_milestones'], 
+                        gamma=self.args['init_lr_decay']
+                    )
+                elif self.args['scheduler'] == 'cosine':
+                    scheduler = optim.lr_scheduler.CosineAnnealingLR(
+                        optimizer=optimizer,
+                        T_max=self.args['init_epoch']
+                    ) 
+            elif self.args["optimizer"] == "ours":
+                optimizer = quant.QuantMomentumOptimizer(
+                    self._network.parameters(),
+                    momentum=0.9,
+                    lr=self.args['init_lr'],
+                )
+                # never use 
+                scheduler = optim.lr_scheduler.StepLR(
+                    optimizer=optimizer, step_size=1e32, gamma=1
+                )
             else:
                 raise NotImplementedError
             
@@ -161,23 +184,47 @@ class MEMO(BaseLearner):
                 cur_test_acc = self._compute_accuracy(self._network, self.test_loader)
                 logging.info(f"Loaded_Test_Acc:{load_acc} Cur_Test_Acc:{cur_test_acc}")
         else:
-            optimizer = optim.SGD(
-                filter(lambda p: p.requires_grad, self._network.parameters()), 
-                lr=self.args['lr'], 
-                momentum=0.9, 
-                weight_decay=self.args['weight_decay']
-            )
-            if self.args['scheduler'] == 'steplr':
+            if 'fp13' in self.args["quantMethod"]:
+                optimizer = lp.optim.SGD(
+                    self._network.parameters(),
+                    momentum=0.9,
+                    lr=self.args['lr'],
+                    weight_decay=self.args['weight_decay'],
+                    weight_quantize=False
+                )
                 scheduler = optim.lr_scheduler.MultiStepLR(
-                    optimizer=optimizer,
-                    milestones=self.args['milestones'], 
+                    optimizer=optimizer, milestones=self.args['milestones'],
                     gamma=self.args['lr_decay']
                 )
-            elif self.args['scheduler'] == 'cosine':
-                assert self.args['t_max'] is not None
-                scheduler = optim.lr_scheduler.CosineAnnealingLR(
-                    optimizer=optimizer,
-                    T_max=self.args['t_max']
+            elif self.args["optimizer"] == "sgd":
+                optimizer = optim.SGD(
+                    filter(lambda p: p.requires_grad, self._network.parameters()), 
+                    lr=self.args['lr'], 
+                    momentum=0.9, 
+                    weight_decay=self.args['weight_decay']
+                )
+                if self.args['scheduler'] == 'steplr':
+                    scheduler = optim.lr_scheduler.MultiStepLR(
+                        optimizer=optimizer,
+                        milestones=self.args['milestones'], 
+                        gamma=self.args['lr_decay']
+                    )
+                elif self.args['scheduler'] == 'cosine':
+                    # changed from t_max to epochs 
+                    assert self.args['init_epoch'] is not None
+                    scheduler = optim.lr_scheduler.CosineAnnealingLR(
+                        optimizer=optimizer,
+                        T_max=self.args['init_epoch']
+                    )
+            elif self.args["optimizer"] == "ours":
+                optimizer = quant.QuantMomentumOptimizer(
+                    self._network.parameters(),
+                    momentum=0.9,
+                    lr=self.args['lr'],
+                )
+                # never use 
+                scheduler = optim.lr_scheduler.StepLR(
+                    optimizer=optimizer, step_size=1e32, gamma=1
                 )
             else:
                 raise NotImplementedError
