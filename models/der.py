@@ -116,7 +116,7 @@ class DER(BaseLearner):
     def _train(self, train_loader, test_loader):
         self._network.to(self._device)
         if self._cur_task == 0:
-          if self.args["quantMethod"] == "fp134" or self.args["quantMethod"] == "fp130":
+          if 'fp13' in self.args["quantMethod"]:
             optimizer = lp.optim.SGD(
                 self._network.parameters(),
                 momentum=0.9,
@@ -159,7 +159,7 @@ class DER(BaseLearner):
               logging.info(f"Loaded Test Acc:{test_acc} Cur_Test_Acc:{cur_test_acc}")
                 
         else:
-          if self.args["quantMethod"] == "fp134" or self.args["quantMethod"] == "fp130":
+          if 'fp13' in self.args["quantMethod"]:
             optimizer = lp.optim.SGD(
                 self._network.parameters(),
                 momentum=0.9,

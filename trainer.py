@@ -126,7 +126,7 @@ def _train(args):
   quant.global_args = args
   LUQ.global_args = args
 
-  if args['fp130']:
+  if 'fp130' in args['quantMethod']:
     quant.quantFP134_rep = '11111110'
 
   start_time = time.time()

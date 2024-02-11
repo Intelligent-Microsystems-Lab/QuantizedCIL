@@ -86,7 +86,7 @@ def setup_parser():
                       required=False, choices=['max'])
   parser.add_argument('--quantizeTrack', action="store_true")
   parser.add_argument('--quantMethod', '-qmethod', type=str,
-                      default=None, required=False, choices=['luq_corrected', 'luq_og', 'fp134_4', 'fp134_8', 'fp130',
+                      default=None, required=False, choices=['luq_corrected', 'luq_og', 'fp134', 'fp130_8', 'fp130_4',
                                                              'ours', 'noq'])
   parser.add_argument('--quantFWDWgt', '-qfwdw', type=str,
                       default=None, required=False, choices=['sawb', "int",

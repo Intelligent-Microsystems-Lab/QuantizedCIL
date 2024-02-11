@@ -113,7 +113,7 @@ class iCaRL(BaseLearner):
       self._old_network.to(self._device)
 
     if self._cur_task == 0:
-      if self.args["quantMethod"] == "fp134" or self.args["quantMethod"] == "fp130":
+      if 'fp13' in self.args["quantMethod"]:
         optimizer = lp.optim.SGD(
             self._network.parameters(),
             momentum=0.9,
@@ -151,7 +151,7 @@ class iCaRL(BaseLearner):
 
       self._init_train(train_loader, test_loader, optimizer, scheduler, data_manager)
     else:
-      if self.args["quantMethod"] == "fp134" or self.args["quantMethod"] == "fp130":
+      if 'fp13' in self.args["quantMethod"]:
         optimizer = lp.optim.SGD(
             self._network.parameters(),
             momentum=0.9,

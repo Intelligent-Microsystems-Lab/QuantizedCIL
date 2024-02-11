@@ -285,7 +285,7 @@ class BiC(BaseLearner):
             "weight_decay": 0,
         },
     ]
-    if self.args["quantMethod"] == "fp134" or self.args["quantMethod"] == "fp130":
+    if 'fp13' in self.args["quantMethod"]:
       optimizer = lp.optim.SGD(
           network_params,
           momentum=0.9,
