@@ -31,36 +31,49 @@ from torch.nn import functional as F
 
 import torch.nn as nn
 args_in_dim = 405
+seed = [1994, 1379, 1234][0]
+cl_per_task = 2 if seed == 1994 else 4 if seed == 1379 else 3
 # task = 0
+all_distances = []
+all_accs = []
+all_losses = []
+log = False
+line_names = True
 
 zoom = False
 if zoom:
-  nr_tasks = 1
+  nr_tasks = 2
 else:
-  nr_tasks = 1
+  # 19 divided by cl_per_task rounded up
+  import math
+  nr_tasks = math.ceil(19/cl_per_task) 
+
+
+def get_nr_classes(task):
+  return cl_per_task*(task+1) if task < nr_tasks else 19
 
 for t in range(nr_tasks):
-  resolution = 15
+  resolution = 50
   task_to_display = t
-  default_file = 2
-  nr_classes = 2*(task_to_display+1) if task_to_display < 9 else 11
+  default_file = 4 # 2
+  nr_classes = get_nr_classes(task_to_display)
   epsilon = 1e-10
 
   # model_accs = [0.7842,,,,]
   if zoom:
-    model_files = ['logs/dsads/icarl/weights/fcnet_noq_accbits_16_1994.npy',
-                  'logs/dsads/icarl/weights/fcnet_ours_accbits_16_1994.npy',
-                  'logs/dsads/icarl/weights/fcnet_luq_corrected_accbits_16_1994.npy',
-                  'logs/dsads/icarl/weights/fcnet_ours_accbits_8_1994.npy',
+    model_files = [f'logs/dsads/icarl/weights/fcnet_noq_accbits_16_{seed}.npy',
+                  f'logs/dsads/icarl/weights/fcnet_ours_accbits_16_{seed}.npy',
+                  f'logs/dsads/icarl/weights/fcnet_luq_corrected_accbits_16_{seed}.npy',
+                  f'logs/dsads/icarl/weights/fcnet_ours_accbits_8_{seed}.npy',
                   ]
     names = ['NoQ','HDQT (Ours) 16 Bits','LUQ 16 Bits','HDQT (Ours) 8 Bits',
             ]
   else:
-    model_files = ['logs/dsads/icarl/weights/fcnet_noq_accbits_16_1994.npy',
-                  'logs/dsads/icarl/weights/fcnet_ours_accbits_16_1994.npy',
-                  'logs/dsads/icarl/weights/fcnet_luq_corrected_accbits_16_1994.npy',
-                  'logs/dsads/icarl/weights/fcnet_ours_accbits_8_1994.npy',
-                  'logs/dsads/icarl/weights/fcnet_luq_corrected_accbits_8_1994.npy',
+    model_files = [f'logs/dsads/icarl/weights/fcnet_noq_accbits_16_{seed}.npy',
+                  f'logs/dsads/icarl/weights/fcnet_ours_accbits_16_{seed}.npy',
+                  f'logs/dsads/icarl/weights/fcnet_luq_corrected_accbits_16_{seed}.npy',
+                  f'logs/dsads/icarl/weights/fcnet_ours_accbits_8_{seed}.npy',
+                  f'logs/dsads/icarl/weights/fcnet_luq_corrected_accbits_8_{seed}.npy',
                   ]
     names = ['NoQ','HDQT (Ours) 16 Bits','LUQ 16 Bits','HDQT (Ours) 8 Bits',
             'LUQ 8 Bits',
@@ -70,8 +83,8 @@ for t in range(nr_tasks):
         'dsads',
         True,
         1994,
-        2,
-        2,
+        cl_per_task,
+        cl_per_task,
     )
 
   class Net(nn.Module):
@@ -153,10 +166,76 @@ for t in range(nr_tasks):
       num_workers=4
   )
 
+  def get_model(params, nr_classes):
+    model = Net().cuda()
+    model = load_w(model, params, nr_classes)
+    return model
+
+  def _KD_loss(pred, soft, T):
+    pred = torch.log_softmax(pred / T, dim=1)
+    soft = torch.softmax(soft / T, dim=1)
+    return -1 * torch.mul(soft, pred).sum() / pred.shape[0]
+  
+  def get_model_accuracy_and_loss(model):
+    model.eval()
+    correct, total = 0, 0
+    loss = []
+    cnt = []
+    if task_to_display > 0:
+        params_old, _ = load_params('def',task_to_display-1, 90)
+        old_model = get_model(params_old, get_nr_classes(task_to_display-1))
+    for i, (_, inputs, targets) in enumerate(test_loader):
+      inputs = inputs.cuda()
+      targets = targets.cuda()
+      with torch.no_grad():
+        outputs = model(inputs)
+        predicts = torch.max(outputs, dim=1)[1]
+        correct += (predicts == targets).sum()
+        total += len(targets)
+      if task_to_display > 0:
+        with torch.no_grad():
+          outputs_old = old_model(inputs)
+        try:
+          kd_loss = _KD_loss(outputs[:, : get_nr_classes(task_to_display-1)], outputs_old, 2)
+        except:
+          import pdb; pdb.set_trace()
+        loss.append(F.cross_entropy(outputs, targets) + kd_loss)
+       
+      else:
+        loss.append(F.cross_entropy(outputs, targets))
+      cnt.append(outputs.shape[0])
+    return (correct / total).to("cpu").numpy() * 100, torch.tensor(loss) @ torch.tensor(cnt, dtype = torch.float) / np.sum(cnt)
+
+
+  def get_all_model_accuracies_and_loss(model_files):
+    accs = []
+    loss = []
+    all_losses = {key: [] for key in names}
+    all_accs = {key: [] for key in names}
+    for i, file in enumerate(model_files):
+
+      for j in [0,10,20,30,40,50,60,70,80,90]:
+        params, _  = load_params(file, task_to_display, j)
+        # params, _ = load_params(file, task_to_display, 90)
+        model = get_model(params, nr_classes)
+        acc, ls = get_model_accuracy_and_loss(model)
+        all_losses[names[i]].append(np.round(ls,4))
+        all_accs[names[i]].append(np.round(acc,4))
+        if j == 90:
+          accs.append(acc)
+          loss.append(ls)
+      
+    return accs, loss, all_accs, all_losses
+
+  
+
   def get_loss(model):
 
     model.eval()
     correct, total, loss, cnt = 0, 0, [], []
+    if task_to_display > 0:
+      params_old, _ = load_params('def',task_to_display-1, 90)
+      old_model = get_model(params_old, get_nr_classes(task_to_display-1))
     for i, (_, inputs, targets) in enumerate(test_loader):
       inputs = inputs.cuda()
       targets = targets.cuda()
@@ -166,7 +245,14 @@ for t in range(nr_tasks):
       correct += (predicts == targets).sum()
       total += len(targets)
 
-      loss.append(F.cross_entropy(outputs, targets))
+      if task_to_display > 0:
+        with torch.no_grad():
+          outputs_old = old_model(inputs)
+        kd_loss = _KD_loss(outputs[:, : get_nr_classes(task_to_display-1)], outputs_old, 2)
+        loss.append(F.cross_entropy(outputs, targets) + kd_loss)
+       
+      else:
+        loss.append(F.cross_entropy(outputs, targets))
       cnt.append(outputs.shape[0])
 
     return torch.tensor(loss) @ torch.tensor(cnt, dtype = torch.float) / np.sum(cnt)
@@ -176,12 +262,12 @@ for t in range(nr_tasks):
 
     xv, yv = np.meshgrid(x, y)
 
-
     zv_list = np.ones((resolution,resolution)) * -1
     for i in range(resolution):
       for j in range(resolution):
 
-        model = load_w(model, variables + xv[i,j] * xdirection + yv[i,j] * ydirection)# interpolate_vars)
+        model = load_w(model, variables + xv[i,j] * xdirection + yv[i,j] * ydirection,
+                       nr_classes=nr_classes)# interpolate_vars)
         zv_list[i,j] = get_loss(model)
         print('.', end='')
 
@@ -255,11 +341,8 @@ for t in range(nr_tasks):
 
 
 
-  model = Net().cuda()
 
-
-
-  def load_w(model, params):
+  def load_w(model, params, nr_classes=nr_classes):
     with torch.no_grad():
       model.fc1.weight = nn.Parameter(torch.tensor(np.reshape(params[:405*405], (405,405))).cuda())
       model.fc2.weight = nn.Parameter(torch.tensor(np.reshape(params[405*405:405*405*2], (405,405))).cuda())
@@ -269,14 +352,26 @@ for t in range(nr_tasks):
 
 
 
+  # model = Net().cuda()
+  # model = load_w(model, params_end, nr_classes=nr_classes)
+  print(names)
+  task_accus, task_losses, all_task_accs, all_task_losses = get_all_model_accuracies_and_loss(model_files)
+  all_accs.append(task_accus)
+  all_losses.append(task_losses)
+  print(task_accus, task_losses)
+  print(all_task_accs, all_task_losses)
+  # import pdb; pdb.set_trace()
 
-  model = load_w(model, params_end)
+  model = get_model(params_end, nr_classes)
 
   xv, yv, zv = get_surface(model, x, y, xdirection, ydirection, params_end)
 
-  # import pdb; pdb.set_trace()
+  
   try:
-    zv = np.log(zv+epsilon)
+    if log:
+      zv = np.log(zv+epsilon)
+    else:
+      zv = zv+epsilon
   except:
     import pdb; pdb.set_trace()
 
@@ -287,19 +382,41 @@ for t in range(nr_tasks):
   plt.rc("font", weight="bold")
   fig, ax = plt.subplots(nrows=1, ncols=1, figsize=(14.4, 8.5))
 
+  # calculate eucledean distance between two points
+  def euc_dist(p1, p2):
+    return np.sqrt((p1[0] - p2[0])**2 + (p1[1] - p2[1])**2)
+  
+  # calculate the distance between all points given by xcoord and ycoord
+  # and return the all the distances in a list
+  def calc_distances(xcoord, ycoord):
+    distances = []
+    for i in range(len(xcoord)):
+      distances.append([])
+      for j in range(len(xcoord)):
+        distances[i].append(np.round(euc_dist((xcoord[i][-1], ycoord[i][-1]),
+                                     (xcoord[j][-1], ycoord[j][-1])),3))
+    return distances
 
   def fmt(x):
     s = f"{x:.3f}"
     return rf"{s}" if plt.rcParams["text.usetex"] else f"{s}"
 
   CS = ax.contour(xv, yv, zv, resolution)
+  if not line_names:
+    CS.levels = np.array([]) # contour line name
   ax.clabel(CS, CS.levels, inline=True, fmt=fmt, fontsize=10)
 
+  eucl_distances = calc_distances(xcoord, ycoord)
+  if "noq" in model_files[0] and not zoom:
+    print(f"Distances for {model_files[0]} task {task_to_display}:")
+    print(f"to HDQT 16: {eucl_distances[0][1]}")
+    print(f"to LUQ 16: {eucl_distances[0][2]}")
+    print(f"to HDQT 8: {eucl_distances[0][3]}")
+    print(f"to LUQ 8: {eucl_distances[0][4]}")
+    all_distances.append(eucl_distances[0])
+
+
   for j in range(len(model_files)):
-    # noq is 2
-    # if j == 2:
-    #   continue
-    # import pdb; pdb.set_trace()
     ax.plot(
         xcoord[j],
         ycoord[j],
@@ -310,7 +427,7 @@ for t in range(nr_tasks):
         markerfacecolor="None",
         markersize=8,
         linewidth=gen_lw,
-        alpha=0.5,
+        alpha=0.8,
     )
     ax.plot(
         xcoord[j][-1],
@@ -356,9 +473,32 @@ for t in range(nr_tasks):
     )
   plt.tight_layout()
   if zoom:
-    plt.savefig(f"figures/loss_landscapes/ll_task_{task_to_display}_zoom.pdf", dpi=300, bbox_inches="tight")
-    plt.savefig(f"figures/loss_landscapes/ll_task_{task_to_display}_zoom.svg", dpi=300, bbox_inches="tight")
+    plt.savefig(f"figures/loss_landscapes/ll_task_{task_to_display}_zoom_log_{log}_{seed}.pdf", dpi=300, bbox_inches="tight")
+    plt.savefig(f"figures/loss_landscapes/ll_task_{task_to_display}_zoom_log_{log}_{seed}.svg", dpi=300, bbox_inches="tight")
   else:
-    plt.savefig(f"figures/loss_landscapes/ll_task_{task_to_display}.pdf", dpi=300, bbox_inches="tight")
-    plt.savefig(f"figures/loss_landscapes/ll_task_{task_to_display}.svg", dpi=300, bbox_inches="tight")
+    plt.savefig(f"figures/loss_landscapes/ll_task_{task_to_display}_log_{log}_{seed}.pdf", dpi=300, bbox_inches="tight")
+    plt.savefig(f"figures/loss_landscapes/ll_task_{task_to_display}_log_{log}_{seed}.svg", dpi=300, bbox_inches="tight")
   plt.close()
+
+
+if "noq" in model_files[0] and not zoom:
+  for i in range(len(all_distances)):
+    print(f"Distances for NoQ task {i}:")
+    print(f"to HDQT 16: {all_distances[i][0]}")
+    print(f"to LUQ 16: {all_distances[i][1]}")
+    print(f"to HDQT 8: {all_distances[i][2]}")
+    print(f"to LUQ 8: {all_distances[i][3]}")
+    print("---------------------------------")
+
+import pandas as pd
+# make a dataframe with all accuracies with column names as the model names
+df = pd.DataFrame(all_accs, columns=names)
+print(df)
+
+# make a dataframe with all losses with column names as the model names
+df = pd.DataFrame(all_losses, columns=names)
+print(df)
+
+# make a dataframe with all distances with column names as the model names
+df = pd.DataFrame(all_distances, columns=names)
+print(df)
