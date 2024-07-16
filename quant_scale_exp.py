@@ -16,8 +16,6 @@ from torch.autograd.function import InplaceFunction
 
 from backbones.linears import SimpleLinear
 
-from squant_function import SQuant_func
-
 from hadamard import make_hadamard, biggest_power2_factor
 
 

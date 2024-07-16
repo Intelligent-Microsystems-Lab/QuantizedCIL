@@ -28,8 +28,6 @@ except:
   # makes code executable without lptorch compiled
   pass
 
-from squant_function import SQuant_func
-
 from hadamard import make_hadamard, biggest_power2_factor
 
 
