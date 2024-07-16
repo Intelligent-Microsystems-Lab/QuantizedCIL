@@ -236,10 +236,7 @@ def _train(args):
       elif "luq" in args['quantMethod']:
         np.save(f"logs/{args['dataset']}/{args['model_name']}/gradients/{args['model_type']}_{args['quantMethod']}_accbits_{args['quantAccBits']}_{args['seed']}.npy",
                 LUQ.gradient_library)
-  if args['model_name'] not in ["podnet", "coil"]:
-    save_fc(args, model)
-  else:
-    save_model(args, model)
+  save_model(args, model)
 
   # import pdb; pdb.set_trace()
 
