@@ -33,6 +33,7 @@ grad_quant_bias = {}
 # bias_track = []
 # var_track = []
 
+
 # TODO @clee1994 turn off for speed
 # torch.autograd.set_detect_anomaly(True)
 
@@ -264,8 +265,11 @@ class iCaRL(BaseLearner):
     for i, epoch in enumerate(prog_bar):
 
       self._network.train()
-      losses = 0.0
+      losses = 0.0 
       correct, total = 0, 0
+      if self.args["grad_track"]:
+        grads = []
+        lo = []
       for i, (_, inputs, targets) in enumerate(train_loader):
 
         # ===========================
@@ -284,6 +288,13 @@ class iCaRL(BaseLearner):
         loss = F.cross_entropy(logits, targets)
         optimizer.zero_grad()
         loss.backward()
+
+        if self.args["grad_track"]:# and self._cur_task > 3 and self._cur_task < 6:
+          # import pdb; pdb.set_trace()
+          quant.grad_track_batch.append(self._network.backbone.net[1].lw.weight.grad.norm().item())
+          quant.loss_track_batch.append(loss.item())
+          grads.append(self._network.backbone.net[1].lw.weight.grad.norm().item())
+          lo.append(loss.item())
         # import pdb; pdb.set_trace()
         # bias_track.append(self._network.backbone.net[1].lw.weight.grad.mean())
         # var_track.append(self._network.backbone.net[1].lw.weight.grad.std())
@@ -325,6 +336,11 @@ class iCaRL(BaseLearner):
         gen_cnt += 1
       train_acc = np.around(tensor2numpy(correct) * 100 / total, decimals=2)
 
+      if self.args["grad_track"]:
+        quant.grad_track_epoch.append(np.mean(grads))
+        quant.loss_track_epoch.append(np.mean(lo))
+        quant.batches_per_task.append(i)
+
       if epoch % 10 == 0 and self.args["rec_weights"] is not None:
         if self._cur_task not in quant.weight_recording:
           quant.weight_recording[self._cur_task] = {}
@@ -365,11 +381,17 @@ class iCaRL(BaseLearner):
     else:
       prog_bar = tqdm(range(self.args['epochs']))
     gen_cnt = 0
+
+    
+
     for i, epoch in enumerate(prog_bar):
 
       self._network.train()
       losses = 0.0
       correct, total = 0, 0
+      if self.args["grad_track"]:
+        grads = []
+        lo = []
       for i, (_, inputs, targets) in enumerate(train_loader):
 
         # ===========================
@@ -394,9 +416,17 @@ class iCaRL(BaseLearner):
         loss = loss_clf + loss_kd
         optimizer.zero_grad()
         loss.backward()
-        # import pdb; pdb.set_trace()
-        # bias_track.append(self._network.backbone.net[1].lw.weight.grad.mean())
-        # var_track.append(self._network.backbone.net[1].lw.weight.grad.std())
+
+        if self.args["grad_track"]:# and self._cur_task > 3 and self._cur_task < 6:
+          # import pdb; pdb.set_trace()
+          quant.grad_track_batch.append(self._network.backbone.net[1].lw.weight.grad.norm().item())
+          quant.loss_track_batch.append(loss.item())
+          grads.append(self._network.backbone.net[1].lw.weight.grad.norm().item())
+          lo.append(loss.item())
+          # bias_track.append(self._network.backbone.net[1].lw.weight.grad.mean())
+          # var_track.append(self._network.backbone.net[1].lw.weight.grad.std())
+
+
 
         optimizer.step()
         losses += loss.item()
@@ -429,6 +459,11 @@ class iCaRL(BaseLearner):
         
         gen_cnt += 1
       train_acc = np.around(tensor2numpy(correct) * 100 / total, decimals=2)
+
+      if self.args["grad_track"]:
+        quant.grad_track_epoch.append(np.mean(grads))
+        quant.loss_track_epoch.append(np.mean(lo))
+        quant.batches_per_task.append(i)
 
       if epoch % 10 == 0 and self.args["rec_weights"] is not None:
         if self._cur_task not in quant.weight_recording:

@@ -184,6 +184,24 @@ def _train(args):
   save_time(args, cost_time)
   save_results(args, cnn_curve, nme_curve, no_nme)
 
+  if args["grad_track"] and args["model_name"] == "icarl":
+    try:
+      np.save(f"logs/{args['dataset']}/{args['model_name']}/grads/{args['model_type']}_{args['quantMethod']}_accbits_{args['quantAccBits']}_{args['seed']}_batch.npy",
+                quant.grad_track_batch)
+      np.save(f"logs/{args['dataset']}/{args['model_name']}/loss/{args['model_type']}_{args['quantMethod']}_accbits_{args['quantAccBits']}_{args['seed']}_batch.npy",
+                quant.loss_track_batch)
+      np.save(f"logs/{args['dataset']}/{args['model_name']}/grads/{args['model_type']}_{args['quantMethod']}_accbits_{args['quantAccBits']}_{args['seed']}_epoch.npy",
+                quant.grad_track_epoch)
+      np.save(f"logs/{args['dataset']}/{args['model_name']}/loss/{args['model_type']}_{args['quantMethod']}_accbits_{args['quantAccBits']}_{args['seed']}_epoch.npy",
+                quant.loss_track_epoch)
+    except:
+      os.makedirs(f"logs/{args['dataset']}/{args['model_name']}/grads/", exist_ok=True)
+      os.makedirs(f"logs/{args['dataset']}/{args['model_name']}/loss/", exist_ok=True)
+      np.save(f"logs/{args['dataset']}/{args['model_name']}/grads/{args['model_type']}_{args['quantMethod']}_accbits_{args['quantAccBits']}_{args['seed']}.npy",
+                quant.grad_track)
+      np.save(f"logs/{args['dataset']}/{args['model_name']}/loss/{args['model_type']}_{args['quantMethod']}_accbits_{args['quantAccBits']}_{args['seed']}.npy",
+                quant.loss_track)
+
   if args["rec_weights"]:
     try:
       np.save(f"logs/{args['dataset']}/{args['model_name']}/weights/{args['model_type']}_{args['quantMethod']}_accbits_{args['quantAccBits']}_{args['seed']}.npy",

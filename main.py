@@ -151,6 +151,7 @@ def setup_parser():
   # recording
   parser.add_argument('--rec_grads', action="store_true")
   parser.add_argument('--rec_weights', action="store_true")
+  parser.add_argument('--grad_track', action="store_true")
 
   return parser
 

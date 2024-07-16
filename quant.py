@@ -36,6 +36,11 @@ from hadamard import make_hadamard, biggest_power2_factor
 track_stats = {'grads': {}, 'acts': {}, 'wgts': {},
                'grad_stats': {}, 'test_acc': [], 'train_acc': [], 'loss': [],
                'zeros': {}, 'maxv':{}}
+grad_track_batch = []
+loss_track_batch = []
+grad_track_epoch = []
+loss_track_epoch = []
+batches_per_task = []
 calibrate_phase = False
 quantizeFwd = False
 quantizeBwd = False
