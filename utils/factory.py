@@ -1,5 +1,4 @@
 from models.der import DER
-from models.foster import FOSTER
 from models.icarl import iCaRL
 from models.lwf import LwF
 from models.bic import BiC
@@ -16,8 +15,6 @@ def get_model(model_name, args):
     return LwF(args)
   elif name == "der":
       return DER(args)
-  elif name == "foster":
-      return FOSTER(args)
   elif name == 'memo':
       return MEMO(args)
   else:
