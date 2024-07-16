@@ -94,11 +94,15 @@ def calculate_correlation_matrices(file1, step=90):
   all_correlations_b2_matrix = np.zeros((nr_tasks, nr_tasks))
   all_correlations_fc_matrix = np.zeros((nr_tasks, nr_tasks))
   all_keys = []
+  
   for task in range(nr_tasks):
     for task2 in range(nr_tasks):
       
       params1, backbone_l1, backbone_l2, fc, keys = load_params(file1, task, step)
       params2, backbone_l12, backbone_l22, fc2,_ = load_params(file1, task2, step)
+
+      
+
 
       all_keys = keys
       min_len = min(len(params1), len(params2))
@@ -107,6 +111,7 @@ def calculate_correlation_matrices(file1, step=90):
       corr_b2 = np.corrcoef(backbone_l2, backbone_l22)
       min_len = min(len(fc), len(fc2))
       corr_fc = np.corrcoef(fc[:min_len], fc2[:min_len])
+
 
       all_correlations[(task, task2)] = corr[0][1]
       all_correlations_matrix[task, task2] = corr[0][1]
@@ -146,6 +151,7 @@ def plot_two_correlation_matrices(corr_matrix1, corr_matrix2, keys, name1, name2
       sns.heatmap(corr_matrix1 if i == 0 else corr_matrix2,
                   ax=ax,
                   cbar=i == 0,
+                  annot=True,
                   # vmin=0, vmax=1,
                   cbar_ax=None if i else cbar_ax)
       ax.set_title(name1 if i == 0 else name2, fontsize=fontsize+5, fontweight="bold")
