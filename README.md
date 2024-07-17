@@ -1,46 +1,47 @@
 # Quantized Class Incremental Learning
 
+Code for our paper ["Hadamard Domain Training with Integers for Class Incremental Quantized Learning"](https://web3.arxiv.org/abs/2310.03675) accepted for [Third Conference on Lifelong Learning Agents](https://lifelong-ml.cc/).
+
+## Run Commands
+
+No quant baseline CIL:
 ```python
-python3 main.py
+python3 main.py -model icarl -p benchmark -seed 42467 --dataset="cifar100" --init_cls=20 --incre=20  --model_type="resnet32" --quantMethod="noq"
 ```
 
-```bash
-for i in 649323830 341384131 980310836 749032139 251745660 ; do for j in 4; do model=bic; qsub  -N ${model}_cifar100_${j}fwd_w_int_a_int_bwd_g1_stoch_g2_stoch_w_int_a_stoch_${i} -o ./logs/${model}_cifar100_${j}fwd_w_int_a_int_bwd_g1_stoch_g2_stoch_w_int_a_stoch_${i}.txt  -e ./logs/${model}_cifar100_${j}fwd_w_int_a_int_bwd_g1_stoch_g2_stoch_w_int_a_stoch_${i}.txt run_cifar.script ${i} ${model} ${j}; done; done
-
-for i in 649323830 341384131 980310836 749032139 251745660 ; do for j in 4; do model=icarl; qsub  -N ${model}_cifar100_${j}fwd_w_int_a_int_bwd_g1_stoch_g2_stoch_w_int_a_stoch_${i} -o ./logs/${model}_cifar100_${j}fwd_w_int_a_int_bwd_g1_stoch_g2_stoch_w_int_a_stoch_${i}.txt  -e ./logs/${model}_cifar100_${j}fwd_w_int_a_int_bwd_g1_stoch_g2_stoch_w_int_a_stoch_${i}.txt run_cifar.script ${i} ${model} ${j}; done; done
-
-for i in 649323830 341384131 980310836 749032139 251745660 ; do for j in 4; do model=lwf; qsub  -N ${model}_cifar100_${j}fwd_w_int_a_int_bwd_g1_stoch_g2_stoch_w_int_a_stoch_${i} -o ./logs/${model}_cifar100_${j}fwd_w_int_a_int_bwd_g1_stoch_g2_stoch_w_int_a_stoch_${i}.txt  -e ./logs/${model}_cifar100_${j}fwd_w_int_a_int_bwd_g1_stoch_g2_stoch_w_int_a_stoch_${i}.txt run_cifar.script ${i} ${model} ${j}; done; done
-
-
+HDQT with CIL CIFAR100:
+```python
+python3 main.py -model icarl -p benchmark -seed 42467 --dataset="cifar100" --init_cls=20 --incre=20  --model_type="resnet32" --quantMethod="ours" --quantBits=4 --quantAccBits=8 --quantFWDWgt="int" --quantFWDAct="int" --quantBWDAct="stoch" --quantBWDWgt="int" --quantBWDGrad1="stoch" --quantBWDGrad2="stoch" --quantBlockSize=32
 ```
 
-## HAR
-
-
-### DSADS
-```bash
-for i in 649323830 341384131 980310836 749032139 251745660 ; do for j in 4; do model=bic; qsub  -N ${model}_dsads_${j}fwd_w_int_a_int_bwd_g1_int_g2_int_w_int_a_stoch_${i} -o ./logs/${model}_dsads_${j}fwd_w_int_a_int_bwd_g1_int_g2_int_w_int_a_stoch_${i}.txt  -e ./logs/${model}_dsads_${j}fwd_w_int_a_int_bwd_g1_int_g2_int_w_int_a_stoch_${i}.txt run_dsads.script ${i} ${model} ${j}; done; done
-for i in 649323830 341384131 980310836 749032139 251745660 ; do for j in 4; do model=icarl; qsub  -N ${model}_dsads_${j}fwd_w_int_a_int_bwd_g1_int_g2_int_w_int_a_stoch_${i} -o ./logs/${model}_dsads_${j}fwd_w_int_a_int_bwd_g1_int_g2_int_w_int_a_stoch_${i}.txt  -e ./logs/${model}_dsads_${j}fwd_w_int_a_int_bwd_g1_int_g2_int_w_int_a_stoch_${i}.txt run_dsads.script ${i} ${model} ${j}; done; done
-for i in 649323830 341384131 980310836 749032139 251745660 ; do for j in 4; do model=lwf; qsub  -N ${model}_dsads_${j}fwd_w_int_a_int_bwd_g1_int_g2_int_w_int_a_stoch_${i} -o ./logs/${model}_dsads_${j}fwd_w_int_a_int_bwd_g1_int_g2_int_w_int_a_stoch_${i}.txt  -e ./logs/${model}_dsads_${j}fwd_w_int_a_int_bwd_g1_int_g2_int_w_int_a_stoch_${i}.txt run_dsads.script ${i} ${model} ${j}; done; done
+HDQT with CIL HAR-DSADS:
+```python
+python3 main.py -model icarl -p benchmark -seed 42467 --dataset="dsads" --init_cls=2 --incre=2  --model_type="fcnet" --fc_hid_dim=405 --init_lr=0.01 --lr=0.01 --epochs=100 --init_epoch=100 --memory_size=200 --init_milestones=50 --milestones=50 --quantMethod="ours" --quantBits=4 --quantAccBits=8 --quantFWDWgt="int" --quantFWDAct="int" --quantBWDAct="stoch" --quantBWDWgt="int" --quantBWDGrad1="stoch" --quantBWDGrad2="stoch" --quantBlockSize=32
 ```
 
-
-### HAPT
-
-```bash
-for i in 649323830 341384131 980310836 749032139 251745660 ; do for j in 4; do model=bic; qsub  -N ${model}_hapt_${j}fwd_w_int_a_int_bwd_g1_int_g2_int_w_int_a_stoch_${i} -o ./logs/${model}_hapt_${j}fwd_w_int_a_int_bwd_g1_int_g2_int_w_int_a_stoch_${i}.txt  -e ./logs/${model}_hapt_${j}fwd_w_int_a_int_bwd_g1_int_g2_int_w_int_a_stoch_${i}.txt run_hapt.script ${i} ${model} ${j}; done; done
-for i in 649323830 341384131 980310836 749032139 251745660 ; do for j in 4; do model=icarl; qsub  -N ${model}_hapt_${j}fwd_w_int_a_int_bwd_g1_int_g2_int_w_int_a_stoch_${i} -o ./logs/${model}_hapt_${j}fwd_w_int_a_int_bwd_g1_int_g2_int_w_int_a_stoch_${i}.txt  -e ./logs/${model}_hapt_${j}fwd_w_int_a_int_bwd_g1_int_g2_int_w_int_a_stoch_${i}.txt run_hapt.script ${i} ${model} ${j}; done; done
-for i in 649323830 341384131 980310836 749032139 251745660 ; do for j in 4; do model=lwf; qsub  -N ${model}_hapt_${j}fwd_w_int_a_int_bwd_g1_int_g2_int_w_int_a_stoch_${i} -o ./logs/${model}_hapt_${j}fwd_w_int_a_int_bwd_g1_int_g2_int_w_int_a_stoch_${i}.txt  -e ./logs/${model}_hapt_${j}fwd_w_int_a_int_bwd_g1_int_g2_int_w_int_a_stoch_${i}.txt run_hapt.script ${i} ${model} ${j}; done; done
+LuQ [1] with CIL CIFAR100
+```python
+python3 main.py -model icarl -p benchmark -seed 42467 --dataset="cifar100" --init_cls=20 --incre=20  --model_type="resnet32" --quantMethod="luq_og" --quantBits=4 --quantAccBits=8
 ```
 
-### PAMAP
+Supported CIL methods: icarl, bic, der, lwf, memo, ours  
+Supported data sets: cifar100, dsads, hapt, pamap
 
-```bash
-for i in 649323830 341384131 980310836 749032139 251745660 ; do for j in 4; do model=bic; qsub  -N ${model}_pamap_${j}fwd_w_int_a_int_bwd_g1_int_g2_int_w_int_a_stoch_${i} -o ./logs/${model}_pamap_${j}fwd_w_int_a_int_bwd_g1_int_g2_int_w_int_a_stoch_${i}.txt  -e ./logs/${model}_pamap_${j}fwd_w_int_a_int_bwd_g1_int_g2_int_w_int_a_stoch_${i}.txt run_pamap.script ${i} ${model} ${j}; done; done
-for i in 649323830 341384131 980310836 749032139 251745660 ; do for j in 4; do model=icarl; qsub  -N ${model}_pamap_${j}fwd_w_int_a_int_bwd_g1_int_g2_int_w_int_a_stoch_${i} -o ./logs/${model}_pamap_${j}fwd_w_int_a_int_bwd_g1_int_g2_int_w_int_a_stoch_${i}.txt  -e ./logs/${model}_pamap_${j}fwd_w_int_a_int_bwd_g1_int_g2_int_w_int_a_stoch_${i}.txt run_pamap.script ${i} ${model} ${j}; done; done
-for i in 649323830 341384131 980310836 749032139 251745660 ; do for j in 4; do model=lwf; qsub  -N ${model}_pamap_${j}fwd_w_int_a_int_bwd_g1_int_g2_int_w_int_a_stoch_${i} -o ./logs/${model}_pamap_${j}fwd_w_int_a_int_bwd_g1_int_g2_int_w_int_a_stoch_${i}.txt  -e ./logs/${model}_pamap_${j}fwd_w_int_a_int_bwd_g1_int_g2_int_w_int_a_stoch_${i}.txt run_pamap.script ${i} ${model} ${j}; done; done
+All packages necessary to run commands can be found in requirements.txt
+
+## Citation
+```
+@article{schiemer2023hadamard,
+  title={Hadamard Domain Training with Integers for Class Incremental Quantized Learning},
+  author={Schiemer, Martin and Schaefer, Clemens JS and Vap, Jayden Parker and Horeni, Mark James and Wang, Yu Emma and Ye, Juan and Joshi, Siddharth},
+  journal={arXiv preprint arXiv:2310.03675},
+  year={2023}
+}
 ```
 
 ## Sources
-- https://openreview.net/forum?id=yTbNYYcopd 
-- https://github.com/zhoudw-zdw/CIL_Survey 
+[1] LuQ https://openreview.net/forum?id=yTbNYYcopd
+
+[2] FP134 https://openreview.net/forum?id=3HJOA-1hb0e
+
+[2] https://github.com/zhoudw-zdw/CIL_Survey 
