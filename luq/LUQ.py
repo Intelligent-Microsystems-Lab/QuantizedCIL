@@ -83,6 +83,8 @@ class Conv2d_LUQ(nn.Conv2d):
                               self.padding, self.dilation, self.groups)
 
             if quantAccFWD and quantAccBits < 16:
+                if quantAccFWD == "fp":
+                    raise NotImplementedError
                 output = AccQuant.apply((output / sw) /sa ) * sw * sa
             else:
                 output = output
@@ -160,6 +162,8 @@ class Linear_LUQ(nn.Linear):
             output = F.linear(qinput, w_q, self.bias,)
 
             if quantAccFWD and quantAccBits < 16:
+                if quantAccFWD == "fp":
+                    raise NotImplementedError
                 output = AccQuant.apply((output / sw) /sa )  * sw * sa
             else:
                 output = output
