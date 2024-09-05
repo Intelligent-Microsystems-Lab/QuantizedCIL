@@ -89,19 +89,20 @@ def setup_parser():
                       default=None, required=False, choices=['luq_corrected', 'luq_og', 'fp134', 'fp130_8', 'fp130_4',
                                                              'ours', 'noq'])
   parser.add_argument('--quantFWDWgt', '-qfwdw', type=str,
-                      default=None, required=False, choices=['sawb', "int",
+                      default=None, required=False, choices=['sawb', "int", "fp",
                                                              'lsq', 'noq', 'mem'])
   parser.add_argument('--quantFWDAct', '-qfwda', type=str,
-                      default=None, required=False, choices=['sawb', "int",
+                      default=None, required=False, choices=['sawb', "int", "fp",
                                                              'lsq', 'noq'])
   parser.add_argument('--quantBWDWgt', '-qbwdw', type=str,
-                      default=None, required=False, choices=["int", 'noq'])
+                      default=None, required=False, choices=["int", 'noq', "fp"])
   parser.add_argument('--quantBWDAct', '-qbwda', type=str,
-                      default=None, required=False, choices=["int", 'noq', 'stoch'])
+                      default=None, required=False, choices=["int", 'noq',
+                                                             'stoch', "fp",])
   parser.add_argument('--quantBWDGrad1', '-qbwdg1', type=str, default="int",
-                      required=False, choices=['stoch', 'sq', 'int', 'noq'])
+                      required=False, choices=['stoch', 'sq', 'int', "fp", 'noq'])
   parser.add_argument('--quantBWDGrad2', '-qbwdg2', type=str, default="int",
-                      required=False, choices=['stoch', 'sq', 'int', 'noq'])
+                      required=False, choices=['stoch', 'sq', 'int', "fp", 'noq'])
   parser.add_argument('--quantBlockSize', type=int, default=32)
   parser.add_argument('--quantUpdateP', '-qUP', type=int, default=100)
   parser.add_argument('--quantUpdateLowThr', '-qULT', type=float, default=.7)
@@ -109,9 +110,13 @@ def setup_parser():
   parser.add_argument('--quantReplaySize', '-qRS', type=int, default=0,)
   parser.add_argument('--quantHadOff', action="store_true")
   parser.add_argument('--quantAccBits', type=int, default=16)
-  parser.add_argument('--quantAccFWD', type=bool, default=True)
-  parser.add_argument('--quantAccBWD', type=bool, default=True)
+  parser.add_argument('--quantAccFWD', '-qfwdac', type=str,
+                      default=None, required=False, choices=["int", 'fp', 'noq'])
+  parser.add_argument('--quantAccBWD', '-qbwdac', type=str,
+                      default=None, required=False, choices=["int", 'fp', 'noq'])
   parser.add_argument('--quantRequantize', type=bool, default=True)
+  parser.add_argument('--exp_bits_acc', type=int, default=16)
+  parser.add_argument('--mant_bits_acc', type=int, default=16)
 
   # training parameters
   parser.add_argument('--init_epoch', type=int, default=170)

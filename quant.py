@@ -94,8 +94,12 @@ weight_recording = {}
 # mantissa_bits = 1 # fp4
 exponent_bits = 5 # fp8
 mantissa_bits = 2 # fp8
+exponent_bits_acc = 5 # fp8
+mantissa_bits_acc = 2 # fp8
 # exponent_bits = 5 # fp16
 # mantissa_bits = 10 # fp16
+# exponent_bits_acc = 5 # shehab
+# mantissa_bits_acc = 12 # shehab
 
 
 class QuantMomentumOptimizer(torch.optim.Optimizer):
@@ -555,7 +559,7 @@ class dynamic_intQ_FWD(Function):
     return grad_output, None
 
 
-def dynamic_fpQ(x):
+def dynamic_fpQ(x, exponent_bits, mantissa_bits):
   # Handle zero separately
   zero_mask = (x == 0)
 
@@ -665,10 +669,12 @@ class FLinearQ(torch.autograd.Function):
         except:
           import pdb; pdb.set_trace()
         # requantize to acc BW (clamp to big values - no scale)
-        if quantAccFWD and quantAccBits < 16:
-          # TODO add FP quant
+        if quantAccBWD == "int" and quantAccBits < 16:
+          # already integers so only clamp required
           n = 2**quantAccBits / 2 - 1
           output = torch.clamp(output, -n, n)
+        elif quantAccBWD == "fp":
+          output = dynamic_fpQ(output, exponent_bits_acc, mantissa_bits_acc)
 
         if quantUpdateScalePhase:
           global scale_library
@@ -681,16 +687,15 @@ class FLinearQ(torch.autograd.Function):
     else:
       fin_output = F.linear(x, w)
       # requantize to acc BW (clamp to big values - no scale)
-      if quantAccFWD and quantAccBits < 16:
-        # TODO add FP quant
+      if quantAccBWD == "int" and quantAccBits < 16:
         n = 2**quantAccBits / 2 - 1
         fin_output = torch.clamp(fin_output, -n, n)
+      elif quantAccBWD == "fp":
+        import pdb; pdb.set_trace()
+        fin_output = dynamic_fpQ(fin_output, exponent_bits_acc, mantissa_bits_acc)
+  
+    return fin_output * sw * sx
 
-    # TODO add FP quant if clause
-    try:
-      return fin_output * sw * sx
-    except:
-      import pdb; pdb.set_trace()
 
   @staticmethod
   def setup_context(ctx, inputs, output):
@@ -711,7 +716,7 @@ class FLinearQ(torch.autograd.Function):
       if quantBWDWgt == 'int':
         w_h1, swh1 = dynamic_intQ(w_h1, scale=1.)
       elif quantBWDWgt == 'fp':
-        w_h1 = dynamic_fpQ(w_h1)
+        w_h1 = dynamic_fpQ(w_h1, exponent_bits, mantissa_bits)
         swh1 = torch.tensor([1.0])
         swh1 = swh1.to(w.device)
       elif quantBWDWgt == 'noq':
@@ -733,7 +738,7 @@ class FLinearQ(torch.autograd.Function):
     if quantBWDGrad1 == 'int':
       grad_output_h1, sg1 = dynamic_intQ(grad_output_h1)
     elif quantBWDGrad1 == 'fp':
-      grad_output_h1 = dynamic_fpQ(grad_output_h1)
+      grad_output_h1 = dynamic_fpQ(grad_output_h1, exponent_bits, mantissa_bits)
       sg1 = torch.tensor([1.0])
       sg1 = sg1.to(w.device)
     elif quantBWDGrad1 == 'sq':
@@ -758,10 +763,11 @@ class FLinearQ(torch.autograd.Function):
     if global_args["rec_grads"]:
       grad_input_copy = grad_input.clone().detach()
    
-    # TODO add FP quant if clause
-    if quantAccBWD and quantAccBits < 16:
+    if quantAccBWD == "int" and quantAccBits < 16:
       n = 2**quantAccBits / 2 - 1
       grad_input = torch.clamp(grad_input, -n, n)
+    elif quantAccBWD == "fp":
+      grad_input = dynamic_fpQ(grad_input, exponent_bits_acc, mantissa_bits_acc)
     # get bias 
     # or kl div
     global batchnr
@@ -802,7 +808,7 @@ class FLinearQ(torch.autograd.Function):
       if quantBWDAct == 'int':
         x_h2, sxh2 = dynamic_intQ(x_h2, scale=1.)
       elif quantBWDAct == 'fp':
-        x_h2 = dynamic_fpQ(x_h2)
+        x_h2 = dynamic_fpQ(x_h2, exponent_bits, mantissa_bits)
         sxh2 = torch.tensor([1.0])
         sxh2 = sxh2.to(w.device)
       elif quantBWDAct == 'noq':
@@ -825,7 +831,7 @@ class FLinearQ(torch.autograd.Function):
     if quantBWDGrad2 == 'int':
       grad_output_h2, sg2 = dynamic_intQ(grad_output_h2)
     elif quantBWDGrad2 == 'fp':
-      grad_output_h2 = dynamic_fpQ(grad_output_h2)
+      grad_output_h2 = dynamic_fpQ(grad_output_h2, exponent_bits, mantissa_bits)
       sg2 = torch.tensor([1.0])
       sg2 = sg2.to(w.device)
     elif quantBWDGrad2 == 'sq':
@@ -842,11 +848,11 @@ class FLinearQ(torch.autograd.Function):
 
     grad_w = (grad_output_h2 @ x_h2) 
 
-    #TODO fp quant alternative?
-    # shoud we have if quantAccBWD and quantAccBits < 16: here wasnt there before
-    # if quantAccBWD and quantAccBits < 16:
-    n = 2**quantAccBits / 2 - 1
-    grad_w = torch.clamp(grad_w, -n, n)
+    if quantAccBWD == "int" and quantAccBits < 16:
+      n = 2**quantAccBits / 2 - 1
+      grad_w = torch.clamp(grad_w, -n, n)
+    elif quantAccBWD == "fp":
+      grad_w = dynamic_fpQ(grad_w, exponent_bits_acc, mantissa_bits_acc)
 
     return grad_input * sg1 * swh1 * sw * 1 / biggest_power2_factor(h_out.shape[0]), grad_w * sg2 * sxh2 * sx * 1 / biggest_power2_factor(h_bs.shape[0]), None, None, None, None
 

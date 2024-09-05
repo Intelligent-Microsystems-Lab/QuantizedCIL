@@ -107,6 +107,8 @@ def _train(args):
   quant.quantTrack = args["quantizeTrack"]
   quant.quantBits = args["quantBits"]
   quant.quantAccBits = args["quantAccBits"]
+  quant.exponent_bits_acc = args["exp_bits_acc"]
+  quant.mantissa_bits_acc = args["mant_bits_acc"]
   quant.quantAccFWD = args["quantAccFWD"]
   quant.quantAccBWD = args["quantAccBWD"]
   LUQ.quantAccBits = args["quantAccBits"]
