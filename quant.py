@@ -31,6 +31,8 @@ except:
 from hadamard import make_hadamard, biggest_power2_factor
 
 
+EPSILON = 1e-32
+
 track_stats = {'grads': {}, 'acts': {}, 'wgts': {},
                'grad_stats': {}, 'test_acc': [], 'train_acc': [], 'loss': [],
                'zeros': {}, 'maxv':{}}
@@ -88,6 +90,14 @@ quant_range_use_perc = {}
 weight_recording = {}
 
 
+# exponent_bits = 2 # fp4
+# mantissa_bits = 1 # fp4
+exponent_bits = 5 # fp8
+mantissa_bits = 2 # fp8
+# exponent_bits = 5 # fp16
+# mantissa_bits = 10 # fp16
+
+
 class QuantMomentumOptimizer(torch.optim.Optimizer):
 
   # Init Method:
@@ -123,7 +133,7 @@ class QuantMomentumOptimizer(torch.optim.Optimizer):
             scale = mx / (2**(quantWgtStoreBits - 1) - 1)
             x = torch.clamp(x, -mx, mx)
             # epsilion for vmap # TODO eps size?
-            return torch.round(x / (scale + 1e-32)) * scale
+            return torch.round(x / (scale + EPSILON)) * scale
 
           p.data = dynamic_intQ2(p.data)
 
@@ -452,7 +462,7 @@ def update_scale(m, c_path='',):
           
       if isinstance(target_attr, Linear_Ours): # or isinstance(target_attr,
         if hasattr(target_attr, 'c1'):
-          c_name = c_path + '_' + attr_strpdb
+          c_name = c_path + '_' + attr_str
           if scale_library[c_path + '_' + attr_str][1] > quantUpdateHighThr:
             with torch.no_grad():
               target_attr.weight /= 2
@@ -492,7 +502,7 @@ def dynamic_stoch(x, scale=1):
 
   mx = torch.min(x.abs().max(), torch.ones_like(x[0]) * 1e+8) * scale  # torch.quantile(x.abs(), .99) # TODO optimize calibration
   scale = mx / (2**(quantBits - 1) - 1)
-  x = torch.clamp(x, -mx, mx) / (scale + 1e-32)
+  x = torch.clamp(x, -mx, mx) / (scale + EPSILON)
 
   sign = torch.sign(x)
   xq_ord = torch.floor(x.abs())
@@ -513,7 +523,7 @@ def dynamic_intQ(x, scale=None):
   scale = mx / (2**(quantBits - 1) - 1)
   x = torch.clamp(x, -mx, mx)
   # epsilion for vmap # TODO eps size?
-  return torch.round(x / (scale + 1e-32)), scale
+  return torch.round(x / (scale + EPSILON)), scale
 
 class dynamic_intQ_FWD(Function):
 
@@ -529,7 +539,7 @@ class dynamic_intQ_FWD(Function):
       scale = mx / (2**(quantBits) - 1)
       x = torch.clamp(x, 0, mx)
 
-    return torch.round(x / (scale + 1e-32) ), scale
+    return torch.round(x / (scale + EPSILON) ), scale
 
   @staticmethod
   def backward(ctx, grad_output, grad_scale):
@@ -543,6 +553,81 @@ class dynamic_intQ_FWD(Function):
         x < -local_mx, torch.tensor([0], dtype=x.dtype, device=x.device), grad_output)
 
     return grad_output, None
+
+
+def dynamic_fpQ(x):
+  # Handle zero separately
+  zero_mask = (x == 0)
+
+  # Get absolute value and log2
+  abs_data = torch.abs(x)
+  # add epsilon to avoid log(0)
+  log2_data = torch.log2(abs_data+EPSILON)
+
+  # Compute exponent
+  exponent = torch.floor(log2_data).int()
+
+  # Apply bias to exponent
+  bias = 2**(exponent_bits-1)-1
+  biased_exponent = torch.clamp(exponent + bias, 0, 2**exponent_bits-1)
+
+  # Compute mantissa
+  try:
+    mantissa = abs_data / torch.ldexp(torch.tensor(1.0), exponent) - 1
+    mantissa = torch.clamp(mantissa, 0, 1-2**(-mantissa_bits))  # Ensure mantissa is in [0, 1-2**(-mantissa_bits)]
+    mantissa = torch.round(mantissa * 2**mantissa_bits) / 2**mantissa_bits  # mantissa_bits mantissa
+  except:
+    import pdb; pdb.set_trace()
+  # Combine components
+  result = torch.ldexp(1.0 + mantissa, biased_exponent - bias)
+
+  # Restore sign and zero
+  result = torch.copysign(result, x)
+  result[zero_mask] = 0
+
+  return result
+
+class dynamic_fpQ_FWD(Function):
+
+  @staticmethod
+  def forward(ctx, x):
+    mx = x.abs().max() * global_args["quantile"]
+    ctx.mx = mx
+    ctx.save_for_backward(x)
+
+    abs_x = x.abs()
+
+    # Perform floating point quantization
+    log2_data = torch.log2(abs_x + EPSILON)  # Avoid log(0)
+    exponent = torch.floor(log2_data).int()
+    bias = 2**(exponent_bits - 1) - 1
+    biased_exponent = torch.clamp(exponent + bias, 0, 2**exponent_bits - 1)
+    
+    mantissa = abs_x / torch.ldexp(torch.tensor(1.0), exponent) - 1
+    mantissa = torch.clamp(mantissa, 0, 1 - 2**(-mantissa_bits))
+    mantissa = torch.round(mantissa * 2**mantissa_bits) / 2**mantissa_bits
+    
+    quantized = torch.ldexp(1.0 + mantissa, biased_exponent - bias)
+    
+    
+    quantized = torch.where(abs_x == 0, 0, quantized)
+    quantized = torch.copysign(quantized, x)
+
+    return quantized
+
+  @staticmethod
+  def backward(ctx, grad_output):
+    # STE
+    x, = ctx.saved_tensors
+    mx = ctx.mx
+
+    # Calculate gradients for the forward quantization step
+    grad_output = torch.where(x > mx, torch.tensor(
+        [0], dtype=x.dtype, device=x.device), grad_output)
+    grad_output = torch.where(
+        x < -mx, torch.tensor([0], dtype=x.dtype, device=x.device), grad_output)
+
+    return grad_output
 
 
 class FLinearQ(torch.autograd.Function):
@@ -559,7 +644,7 @@ class FLinearQ(torch.autograd.Function):
       scale = mx / (2**(quantBits - 1) -1)
       w = torch.clamp(w, -mx-1, mx-1)
       # print(torch.unique(w).shape)
-      w = torch.round(w / (scale + 1e-32))
+      w = torch.round(w / (scale + EPSILON))
       # print(torch.unique(w).shape)
       if quantUpdateScalePhase:
         # get usage percent of quant bins
@@ -581,6 +666,7 @@ class FLinearQ(torch.autograd.Function):
           import pdb; pdb.set_trace()
         # requantize to acc BW (clamp to big values - no scale)
         if quantAccFWD and quantAccBits < 16:
+          # TODO add FP quant
           n = 2**quantAccBits / 2 - 1
           output = torch.clamp(output, -n, n)
 
@@ -596,10 +682,15 @@ class FLinearQ(torch.autograd.Function):
       fin_output = F.linear(x, w)
       # requantize to acc BW (clamp to big values - no scale)
       if quantAccFWD and quantAccBits < 16:
+        # TODO add FP quant
         n = 2**quantAccBits / 2 - 1
         fin_output = torch.clamp(fin_output, -n, n)
 
-    return fin_output * sw * sx
+    # TODO add FP quant if clause
+    try:
+      return fin_output * sw * sx
+    except:
+      import pdb; pdb.set_trace()
 
   @staticmethod
   def setup_context(ctx, inputs, output):
@@ -619,13 +710,19 @@ class FLinearQ(torch.autograd.Function):
     if quantRequantize:
       if quantBWDWgt == 'int':
         w_h1, swh1 = dynamic_intQ(w_h1, scale=1.)
+      elif quantBWDWgt == 'fp':
+        w_h1 = dynamic_fpQ(w_h1)
+        swh1 = torch.tensor([1.0])
+        swh1 = swh1.to(w.device)
       elif quantBWDWgt == 'noq':
         w_h1 = w_h1
         swh1 = torch.tensor([1.0])
+        swh1 = swh1.to(w.device)
       else:
         raise Exception('Grad rounding scheme not implemented: ' + quantBWDWgt)
     else:
       swh1 = torch.tensor([1.0])
+      swh1 = swh1.to(w.device)
 
     if quantHadOff:
       grad_output_h1 = grad_output
@@ -635,6 +732,10 @@ class FLinearQ(torch.autograd.Function):
     # quant grad_output
     if quantBWDGrad1 == 'int':
       grad_output_h1, sg1 = dynamic_intQ(grad_output_h1)
+    elif quantBWDGrad1 == 'fp':
+      grad_output_h1 = dynamic_fpQ(grad_output_h1)
+      sg1 = torch.tensor([1.0])
+      sg1 = sg1.to(w.device)
     elif quantBWDGrad1 == 'sq':
       raise Exception('not implemented')
       grad_output_h1 = dynamic_squant(grad_output_h1)
@@ -646,6 +747,7 @@ class FLinearQ(torch.autograd.Function):
     elif quantBWDGrad1 == 'noq':
       grad_output_h1 = grad_output_h1
       sg1 = torch.tensor([1.0])
+      sg1 = sg1.to(w.device)
     else:
       raise Exception('Grad rounding scheme not implemented: ' + quantBWDGrad1)
 
@@ -656,6 +758,7 @@ class FLinearQ(torch.autograd.Function):
     if global_args["rec_grads"]:
       grad_input_copy = grad_input.clone().detach()
    
+    # TODO add FP quant if clause
     if quantAccBWD and quantAccBits < 16:
       n = 2**quantAccBits / 2 - 1
       grad_input = torch.clamp(grad_input, -n, n)
@@ -698,15 +801,21 @@ class FLinearQ(torch.autograd.Function):
     if quantRequantize:
       if quantBWDAct == 'int':
         x_h2, sxh2 = dynamic_intQ(x_h2, scale=1.)
+      elif quantBWDAct == 'fp':
+        x_h2 = dynamic_fpQ(x_h2)
+        sxh2 = torch.tensor([1.0])
+        sxh2 = sxh2.to(w.device)
       elif quantBWDAct == 'noq':
         x_h2 = x_h2
         sxh2 = torch.tensor([1.0])
+        sxh2 = sxh2.to(w.device)
       elif quantBWDAct == 'stoch':
         x_h2, sxh2 = dynamic_stoch(x_h2)
       else:
         raise Exception('Grad rounding scheme not implemented: ' + quantBWDAct)
     else:
       sxh2 = torch.tensor([1.0])
+      sxh2 = sxh2.to(w.device)
 
     if quantHadOff:
       grad_output_h2 = grad_output.T
@@ -715,6 +824,10 @@ class FLinearQ(torch.autograd.Function):
     # quant grad_output
     if quantBWDGrad2 == 'int':
       grad_output_h2, sg2 = dynamic_intQ(grad_output_h2)
+    elif quantBWDGrad2 == 'fp':
+      grad_output_h2 = dynamic_fpQ(grad_output_h2)
+      sg2 = torch.tensor([1.0])
+      sg2 = sg2.to(w.device)
     elif quantBWDGrad2 == 'sq':
       raise Exception('not implemented')
       grad_output_h2 = dynamic_squant(grad_output_h2)
@@ -723,11 +836,15 @@ class FLinearQ(torch.autograd.Function):
     elif quantBWDGrad2 == 'noq':
       grad_output_h2 = grad_output_h2
       sg2 = torch.tensor([1.0])
+      sg2 = sg2.to(w.device)
     else:
       raise Exception('Grad rounding scheme not implemented: ' + quantBWDGrad2)
 
     grad_w = (grad_output_h2 @ x_h2) 
 
+    #TODO fp quant alternative?
+    # shoud we have if quantAccBWD and quantAccBits < 16: here wasnt there before
+    # if quantAccBWD and quantAccBits < 16:
     n = 2**quantAccBits / 2 - 1
     grad_w = torch.clamp(grad_w, -n, n)
 
@@ -759,7 +876,7 @@ class Linear_Ours(nn.Linear):
         mult_scale = mult_mx / (2**(quantBits - 1) - 1)
 
         self.register_buffer('sw', scale * mult_scale)
-        self.weight.data = torch.round(self.weight/(scale+1e-32))
+        self.weight.data = torch.round(self.weight/(scale + EPSILON))
 
   def forward(self, input):
 
@@ -769,6 +886,11 @@ class Linear_Ours(nn.Linear):
           self.weight, self.c1, self.c2, self.QpW, self.QnW)
     elif quantFWDWgt == 'int':
       w_q, sw = dynamic_intQ_FWD.apply(self.weight)
+    elif quantFWDWgt == 'fp':
+      # import pdb; pdb.set_trace()
+      w_q = dynamic_fpQ_FWD.apply(self.weight)
+      sw = torch.tensor([1.0])
+      sw = sw.to(self.weight.device)
     elif quantFWDWgt == 'lsq':
       raise Exception('not implemented')
       w_q = lsq(self.weight, self.lsq_wgt, self.QpW, self.QnW)
@@ -778,6 +900,7 @@ class Linear_Ours(nn.Linear):
     elif quantFWDWgt == 'noq':
       w_q = self.weight
       sw = torch.tensor([1.0])
+      sw = sw.to(self.weight.device)
     else:
       raise Exception(
           'FWD weight quantized method not implemented: ' + quantFWDWgt)
@@ -791,17 +914,21 @@ class Linear_Ours(nn.Linear):
       qinput = UniformQuantizeSawb.apply(
           input, self.c1, self.c2, self.QpA, self.QnA)
     elif quantFWDAct == 'int':
-      
       qinput, sa = dynamic_intQ_FWD.apply(input)
+    elif quantFWDAct == 'fp':
+      qinput = dynamic_fpQ_FWD.apply(input)
+      sa = torch.tensor([1.0])
+      sa = sa.to(self.weight.device)
     elif quantFWDAct == 'lsq':
       raise Exception('not implemented')
       qinput = lsq(input, self.lsq_wgt, self.QpA, self.QnA)
     elif quantFWDAct == 'noq':
       qinput = input
       sa = torch.tensor([1.0])
+      sa = sa.to(self.weight.device)
     else:
       raise Exception(
-          'FWD act quantized method not implemented: ' + quantFWDWgt)
+          'FWD act quantized method not implemented: ' + quantFWDAct)
 
     # TODO: optimize speed of hadamard creation
     if input.shape[0] != quantBatchSize:
@@ -844,7 +971,7 @@ class Conv2d_Ours(nn.Conv2d):
         mult_scale = mult_mx / (2**(quantBits - 1) - 1)
 
         self.register_buffer('sw', scale * mult_scale)
-        self.weight.data = torch.round(self.weight/(scale+1e-32))
+        self.weight.data = torch.round(self.weight/(scale + EPSILON))
 
   def forward(self, input):
     
@@ -854,6 +981,9 @@ class Conv2d_Ours(nn.Conv2d):
           self.weight, self.c1, self.c2, self.QpW, self.QnW)
     elif quantFWDWgt == 'int':
       w_q, sw = dynamic_intQ_FWD.apply(self.weight)
+    elif quantFWDWgt == 'fp':
+      w_q = dynamic_fpQ_FWD.apply(self.weight)
+      sw = torch.tensor([1.0])
     elif quantFWDWgt == 'lsq':
       raise Exception('not implemented')
       w_q = lsq(self.weight, self.lsq_wgt, self.QpW, self.QnW)
@@ -877,6 +1007,9 @@ class Conv2d_Ours(nn.Conv2d):
           input, self.c1, self.c2, self.QpA, self.QnA)
     elif quantFWDAct == 'int':
       qinput, sa = dynamic_intQ_FWD.apply(input)
+    elif quantFWDAct == 'fp':
+      qinput = dynamic_fpQ_FWD.apply(input)
+      sa = torch.tensor([1.0])
     elif quantFWDAct == 'lsq':
       raise Exception('not implemented')
       qinput = lsq(input, self.lsq_wgt, self.QpA, self.QnA)
@@ -885,7 +1018,7 @@ class Conv2d_Ours(nn.Conv2d):
       sa = torch.tensor([1.0])
     else:
       raise Exception(
-          'FWD act quantized method not implemented: ' + quantFWDWgt)
+          'FWD act quantized method not implemented: ' + quantFWDAct)
 
     # TODO: optimize speed of hadamard creation
 
@@ -941,7 +1074,7 @@ class CosineLinear_Ours(CosineLinear):
         mult_scale = mult_mx / (2**(quantBits - 1) - 1)
 
         self.register_buffer('sw', scale * mult_scale)
-        self.weight.data = torch.round(self.weight/(scale+1e-32))
+        self.weight.data = torch.round(self.weight/(scale + EPSILON))
 
   def forward(self, input):
     self.weight = F.normalize(self.weight, p=2, dim=1)
@@ -951,6 +1084,9 @@ class CosineLinear_Ours(CosineLinear):
           self.weight, self.c1, self.c2, self.QpW, self.QnW)
     elif quantFWDWgt == 'int':
       w_q, sw = dynamic_intQ_FWD.apply(self.weight)
+    elif quantFWDWgt == 'fp':
+      w_q = dynamic_fpQ_FWD.apply(self.weight)
+      sw = torch.tensor([1.0])
     elif quantFWDWgt == 'lsq':
       raise Exception('not implemented')
       w_q = lsq(self.weight, self.lsq_wgt, self.QpW, self.QnW)
@@ -974,8 +1110,10 @@ class CosineLinear_Ours(CosineLinear):
       qinput = UniformQuantizeSawb.apply(
           input, self.c1, self.c2, self.QpA, self.QnA)
     elif quantFWDAct == 'int':
-      
       qinput, sa = dynamic_intQ_FWD.apply(input)
+    elif quantFWDAct == 'fp':
+      qinput = dynamic_fpQ_FWD.apply(input)
+      sa = torch.tensor([1.0])
     elif quantFWDAct == 'lsq':
       raise Exception('not implemented')
       qinput = lsq(input, self.lsq_wgt, self.QpA, self.QnA)
@@ -984,7 +1122,7 @@ class CosineLinear_Ours(CosineLinear):
       sa = torch.tensor([1.0])
     else:
       raise Exception(
-          'FWD act quantized method not implemented: ' + quantFWDWgt)
+          'FWD act quantized method not implemented: ' + quantFWDAct)
 
     # TODO: optimize speed of hadamard creation
     if input.shape[0] != quantBatchSize:
