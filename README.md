@@ -27,7 +27,7 @@ python3 main.py -model icarl -p benchmark -seed 42467 --dataset="cifar100" --ini
 Supported CIL methods: icarl, bic, der, lwf, memo, ours  
 Supported data sets: cifar100, dsads, hapt, pamap
 
-All packages necessary to run commands can be found in requirements.txt
+Install the dependencies in a Python 3.11 environment with `python -m pip install -r requirements.txt`.
 
 ## Citation
 ```
